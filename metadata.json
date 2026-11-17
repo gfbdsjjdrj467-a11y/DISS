@@ -1,0 +1,6 @@
+{
+  "name": "Strike Arena",
+  "description": "Offline 3D First-Person Shooter for Android with 5 tactical maps, 6 weapon classes, smart AI bots, 5 game modes, and customizable mobile touch controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

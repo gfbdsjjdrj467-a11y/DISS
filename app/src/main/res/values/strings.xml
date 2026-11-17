@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Strike Arena</string>
+    <string name="app_subtitle">MOBILE TACTICAL FPS</string>
+    <string name="menu_play">ИГРАТЬ</string>
+    <string name="menu_maps">ВЫБОР КАРТЫ</string>
+    <string name="menu_arsenal">АРСЕНАЛ</string>
+    <string name="menu_settings">НАСТРОЙКИ</string>
+    <string name="menu_stats">СТАТИСТИКА</string>
+    <string name="menu_exit">ВЫХОД</string>
+</resources>
