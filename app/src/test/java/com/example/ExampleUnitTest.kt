@@ -1,13 +1,17 @@
 package com.example
 
 import com.example.game.engine.AABB
+import com.example.game.engine.GpuMesh
 import com.example.game.engine.Math3D
+import com.example.game.engine.TacticalMeshes
 import com.example.game.engine.Vec3
 import com.example.game.maps.CollisionWorld
 import com.example.game.maps.MapCatalog
 import com.example.game.maps.NavGrid
 import com.example.game.model.MapId
+import com.example.game.model.PickupType
 import com.example.game.model.WeaponCatalog
+import com.example.game.model.WeaponId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -55,5 +59,34 @@ class ExampleUnitTest {
         val sniper = WeaponCatalog.allWeapons.first { it.adsFov < 35f }
         assertNotNull(sniper)
         assertTrue(sniper.damage >= 100)
+    }
+
+    @Test
+    fun allSculptedMeshesHaveValidStrideTrianglesAndFiniteVertices() {
+        fun assertValidMesh(name: String, mesh: GpuMesh) {
+            assertEquals("$name stride mismatch", 0, mesh.vertices.size % GpuMesh.STRIDE_FLOATS)
+            assertTrue("$name must have vertices", mesh.vertexCount > 0)
+            assertEquals("$name must consist of whole triangles", 0, mesh.vertexCount % 3)
+            for (v in mesh.vertices) {
+                assertTrue("$name contains NaN or Inf", v.isFinite())
+            }
+        }
+
+        for (wId in WeaponId.entries) {
+            assertValidMesh("Weapon $wId", TacticalMeshes.buildWeaponMesh(wId))
+        }
+        for (pType in PickupType.entries) {
+            assertValidMesh("Pickup $pType", TacticalMeshes.buildPickupMesh(pType))
+        }
+        for (mapId in MapId.entries) {
+            val map = MapCatalog.getMap(mapId)
+            assertValidMesh("Map $mapId", TacticalMeshes.buildMapMesh(map))
+            assertValidMesh("Sky $mapId", TacticalMeshes.buildSkyDome(map))
+        }
+        assertValidMesh("PlayerArms", TacticalMeshes.buildPlayerViewArms())
+        assertValidMesh("AlphaTorso", TacticalMeshes.buildBotTorso(true))
+        assertValidMesh("BravoHead", TacticalMeshes.buildBotHead(false))
+        assertValidMesh("AlphaArm", TacticalMeshes.buildBotArm(true))
+        assertValidMesh("BotLeg", TacticalMeshes.buildBotLeg())
     }
 }

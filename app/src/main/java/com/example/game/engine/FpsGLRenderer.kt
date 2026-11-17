@@ -21,19 +21,23 @@ class FpsGLRenderer(
 
     private lateinit var worldShader: TacticalWorldShader
     private lateinit var particleShader: UnlitParticleShader
+    private val textureAtlas = TacticalTextureAtlas()
 
     private var mapMesh: GpuMesh? = null
     private var skyMesh: GpuMesh? = null
     private var unitBoxMesh: GpuMesh? = null
+    private var playerArmsMesh: GpuMesh? = null
 
     private lateinit var alphaTorso: GpuMesh
     private lateinit var bravoTorso: GpuMesh
     private lateinit var alphaHead: GpuMesh
     private lateinit var bravoHead: GpuMesh
-    private lateinit var limbArm: GpuMesh
-    private lateinit var limbLeg: GpuMesh
+    private lateinit var alphaArm: GpuMesh
+    private lateinit var bravoArm: GpuMesh
+    private lateinit var botLeg: GpuMesh
 
     private val weaponMeshes = HashMap<WeaponId, GpuMesh>()
+    private val pickupMeshes = HashMap<PickupType, GpuMesh>()
 
     private val projMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
@@ -56,18 +60,26 @@ class FpsGLRenderer(
 
         worldShader = TacticalWorldShader()
         particleShader = UnlitParticleShader()
+        textureAtlas.createAndUpload()
+
         unitBoxMesh = TacticalMeshes.buildUnitBoxMesh()
+        playerArmsMesh = TacticalMeshes.buildPlayerViewArms()
 
         alphaTorso = TacticalMeshes.buildBotTorso(isAlpha = true)
         bravoTorso = TacticalMeshes.buildBotTorso(isAlpha = false)
         alphaHead = TacticalMeshes.buildBotHead(isAlpha = true)
         bravoHead = TacticalMeshes.buildBotHead(isAlpha = false)
-        limbArm = TacticalMeshes.buildBotLimb(0.14f, 0.48f, 0.24f, 0.26f, 0.28f)
-        limbLeg = TacticalMeshes.buildBotLimb(0.17f, 0.72f, 0.17f, 0.19f, 0.21f)
+        alphaArm = TacticalMeshes.buildBotArm(isAlpha = true)
+        bravoArm = TacticalMeshes.buildBotArm(isAlpha = false)
+        botLeg = TacticalMeshes.buildBotLeg()
 
         weaponMeshes.clear()
         for (wId in WeaponId.entries) {
             weaponMeshes[wId] = TacticalMeshes.buildWeaponMesh(wId)
+        }
+        pickupMeshes.clear()
+        for (pType in PickupType.entries) {
+            pickupMeshes[pType] = TacticalMeshes.buildPickupMesh(pType)
         }
         sim.mapGeometryDirty = true
     }
@@ -83,7 +95,6 @@ class FpsGLRenderer(
         val dt = ((now - lastTimeNs) / 1_000_000_000.0).toFloat().coerceIn(0.001f, 0.05f)
         lastTimeNs = now
 
-        // FPS limiter throttle if configured to 30 FPS
         val limit = sim.settings.fpsLimit
         if (limit == 30 && dt < 0.028f) {
             try { Thread.sleep(((0.031f - dt) * 1000f).toLong().coerceIn(1L, 25L)) } catch (_: InterruptedException) {}
@@ -95,7 +106,7 @@ class FpsGLRenderer(
             mapMesh?.delete()
             skyMesh?.delete()
             mapMesh = TacticalMeshes.buildMapMesh(sim.currentMap)
-            skyMesh = TacticalMeshes.buildSkyDomeBox(sim.currentMap)
+            skyMesh = TacticalMeshes.buildSkyDome(sim.currentMap)
             sim.mapGeometryDirty = false
         }
 
@@ -107,21 +118,25 @@ class FpsGLRenderer(
         val aspect = surfaceWidth.toFloat() / surfaceHeight.toFloat()
         val fov = if (sim.isShowcaseMode) 62f else sim.currentFov
         val farPlane = sim.settings.graphicsQuality.drawDistance
-        Matrix.perspectiveM(projMatrix, 0, fov, aspect, 0.06f, farPlane)
+        Matrix.perspectiveM(projMatrix, 0, fov, aspect, 0.05f, farPlane + 65f)
 
-        // Camera setup
         val eye = sim.playerEyePos()
         val shake = sim.cameraShakeAmount
         val shakeY = if (shake > 0.01f) sin(now * 0.00008f) * shake * 0.03f else 0f
         val fwd = Math3D.forwardFromYawPitch(sim.playerYaw, sim.playerPitch)
-        val lookAtX = eye.x + fwd.x
-        val lookAtY = eye.y + fwd.y + shakeY
-        val lookAtZ = eye.z + fwd.z
-        Matrix.setLookAtM(viewMatrix, 0, eye.x, eye.y + shakeY, eye.z, lookAtX, lookAtY, lookAtZ, 0f, 1f, 0f)
+        Matrix.setLookAtM(
+            viewMatrix, 0,
+            eye.x, eye.y + shakeY, eye.z,
+            eye.x + fwd.x, eye.y + fwd.y + shakeY, eye.z + fwd.z,
+            0f, 1f, 0f
+        )
         Matrix.multiplyMM(vpMatrix, 0, projMatrix, 0, viewMatrix, 0)
 
-        // Setup World Shader Uniforms
         GLES20.glUseProgram(worldShader.programId)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureAtlas.textureId)
+        GLES20.glUniform1i(worldShader.uAtlasTex, 0)
+
         GLES20.glUniform3f(worldShader.uSunDir, map.sunDirection.x, map.sunDirection.y, map.sunDirection.z)
         GLES20.glUniform3f(worldShader.uSunColor, map.sunColor.first, map.sunColor.second, map.sunColor.third)
         GLES20.glUniform3f(worldShader.uAmbientColor, map.ambientColor.first, map.ambientColor.second, map.ambientColor.third)
@@ -135,39 +150,43 @@ class FpsGLRenderer(
         GLES20.glUniform1i(worldShader.uDetailLevel, sim.settings.graphicsQuality.surfaceDetailLevel)
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
 
-        // Draw Static Map
+        // Draw Gradient Sky Dome + Sun Disc behind world
+        GLES20.glDepthMask(false)
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
+        GLES20.glUniform1f(worldShader.uFogDensity, 0f)
+        Matrix.setIdentityM(modelMatrix, 0)
+        Matrix.translateM(modelMatrix, 0, eye.x, -4f, eye.z)
+        drawMeshWithModel(skyMesh)
+        GLES20.glUniform1f(worldShader.uFogDensity, map.fogDensity)
+        GLES20.glEnable(GLES20.GL_CULL_FACE)
+        GLES20.glDepthMask(true)
+
+        // Draw Textured Static Map
         Matrix.setIdentityM(modelMatrix, 0)
         drawMeshWithModel(mapMesh)
 
-        // Draw Interactive Doors
+        // Draw Interactive Blast Doors
         for (d in sim.doors) {
             val box = d.currentAABB()
             Matrix.setIdentityM(modelMatrix, 0)
             Matrix.translateM(modelMatrix, 0, box.centerX, box.centerY, box.centerZ)
             Matrix.scaleM(modelMatrix, 0, box.sizeX, box.sizeY, box.sizeZ)
-            GLES20.glUniform4f(worldShader.uTintOverride, d.r, d.g, d.b, 0.9f)
+            GLES20.glUniform4f(worldShader.uTintOverride, d.r, d.g, d.b, 0.72f)
             drawMeshWithModel(unitBoxMesh)
         }
 
-        // Draw Rotating 3D Pickups
+        // Draw Detailed Rotating 3D Pickups
+        GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
         val timeSec = (now / 1_000_000_000.0).toFloat()
         for (p in sim.pickups) {
             if (!p.active) continue
-            val (pr, pg, pb) = when (p.type) {
-                PickupType.HEALTH -> Triple(0.10f, 0.88f, 0.40f)
-                PickupType.AMMO -> Triple(0.96f, 0.68f, 0.12f)
-                PickupType.ARMOR -> Triple(0.18f, 0.72f, 0.98f)
-            }
             Matrix.setIdentityM(modelMatrix, 0)
             Matrix.translateM(modelMatrix, 0, p.pos.x, p.pos.y + sin(timeSec * 3.2f + p.id) * 0.12f, p.pos.z)
-            Matrix.rotateM(modelMatrix, 0, timeSec * 75f + p.id * 45f, 0f, 1f, 0f)
-            Matrix.scaleM(modelMatrix, 0, 0.48f, 0.34f, 0.48f)
-            GLES20.glUniform4f(worldShader.uTintOverride, pr, pg, pb, 0.95f)
-            drawMeshWithModel(unitBoxMesh)
+            Matrix.rotateM(modelMatrix, 0, timeSec * 72f + p.id * 45f, 0f, 1f, 0f)
+            drawMeshWithModel(pickupMeshes[p.type])
         }
-        GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
 
-        // Draw Articulated Bots (LOD: skip distant dead bots)
+        // Draw Articulated Bots (LOD)
         for (b in sim.bots) {
             val dist = b.position.distanceTo(eye)
             if (dist > farPlane) continue
@@ -179,12 +198,11 @@ class FpsGLRenderer(
         val camUp = Vec3(viewMatrix[1], viewMatrix[5], viewMatrix[9]).normalized()
         sim.particlePool.render(particleShader, vpMatrix, camRight, camUp)
 
-        // Draw First-Person 3D Weapon Viewmodel (only during active gameplay & alive)
+        // Draw First-Person Tactical Arms + Detailed Weapon Viewmodel
         if (!sim.isShowcaseMode && sim.isActiveWeaponVisible()) {
-            drawFirstPersonWeapon(aspect, timeSec)
+            drawFirstPersonWeapon(aspect)
         }
 
-        // Push HUD state at ~30Hz
         fpsFrames++
         fpsAccumSec += dt
         if (fpsAccumSec >= 0.5f) {
@@ -215,11 +233,10 @@ class FpsGLRenderer(
         val fallAngle = b.deathFallProgress * 88f
         val swing = if (b.isAlive) sin(b.walkCycle) * 28f else 0f
 
-        // Ground contact shadow (when shadowQuality > 0 and within 45m)
         if (sim.settings.shadowQuality > 0 && dist < 45f && b.isAlive) {
             Matrix.setIdentityM(modelMatrix, 0)
             Matrix.translateM(modelMatrix, 0, b.position.x, 0.02f, b.position.z)
-            Matrix.scaleM(modelMatrix, 0, 0.75f, 0.02f, 0.75f)
+            Matrix.scaleM(modelMatrix, 0, 0.78f, 0.02f, 0.78f)
             GLES20.glUniform4f(worldShader.uTintOverride, 0.04f, 0.05f, 0.06f, 0.85f)
             drawMeshWithModel(unitBoxMesh)
             if (flash > 0.01f) {
@@ -229,7 +246,6 @@ class FpsGLRenderer(
             }
         }
 
-        // Base bot transform
         val baseMatrix = FloatArray(16)
         Matrix.setIdentityM(baseMatrix, 0)
         Matrix.translateM(baseMatrix, 0, b.position.x, b.position.y, b.position.z)
@@ -243,7 +259,7 @@ class FpsGLRenderer(
             System.arraycopy(baseMatrix, 0, modelMatrix, 0, 16)
             Matrix.translateM(modelMatrix, 0, side * 0.13f, 0.72f, 0f)
             Matrix.rotateM(modelMatrix, 0, swing * side, 1f, 0f, 0f)
-            drawMeshWithModel(limbLeg)
+            drawMeshWithModel(botLeg)
         }
 
         // Torso
@@ -258,18 +274,19 @@ class FpsGLRenderer(
         drawMeshWithModel(if (isAlpha) alphaHead else bravoHead)
 
         // Arms & Held Weapon
+        val armMesh = if (isAlpha) alphaArm else bravoArm
         System.arraycopy(baseMatrix, 0, modelMatrix, 0, 16)
-        Matrix.translateM(modelMatrix, 0, -0.27f, 1.24f, 0f)
-        Matrix.rotateM(modelMatrix, 0, -swing * 0.6f, 1f, 0f, 0f)
-        drawMeshWithModel(limbArm)
+        Matrix.translateM(modelMatrix, 0, -0.28f, 1.24f, 0f)
+        Matrix.rotateM(modelMatrix, 0, -swing * 0.55f, 1f, 0f, 0f)
+        drawMeshWithModel(armMesh)
 
         System.arraycopy(baseMatrix, 0, modelMatrix, 0, 16)
-        Matrix.translateM(modelMatrix, 0, 0.27f, 1.24f, 0f)
-        Matrix.rotateM(modelMatrix, 0, 58f + b.recoilKick * 8f, 1f, 0f, 0f)
-        drawMeshWithModel(limbArm)
+        Matrix.translateM(modelMatrix, 0, 0.28f, 1.24f, 0f)
+        Matrix.rotateM(modelMatrix, 0, 62f + b.recoilKick * 8f, 1f, 0f, 0f)
+        drawMeshWithModel(armMesh)
 
         System.arraycopy(baseMatrix, 0, modelMatrix, 0, 16)
-        Matrix.translateM(modelMatrix, 0, 0.24f, 1.15f, -0.34f + b.recoilKick * 0.05f)
+        Matrix.translateM(modelMatrix, 0, 0.24f, 1.15f, -0.35f + b.recoilKick * 0.05f)
         Matrix.rotateM(modelMatrix, 0, b.pitchDeg * 0.6f, 1f, 0f, 0f)
         Matrix.scaleM(modelMatrix, 0, 0.85f, 0.85f, 0.85f)
         drawMeshWithModel(weaponMeshes[b.weaponId])
@@ -277,10 +294,10 @@ class FpsGLRenderer(
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
     }
 
-    private fun drawFirstPersonWeapon(aspect: Float, timeSec: Float) {
+    private fun drawFirstPersonWeapon(aspect: Float) {
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT)
         val viewProjWeapon = FloatArray(16)
-        Matrix.perspectiveM(viewProjWeapon, 0, 58f, aspect, 0.03f, 5f)
+        Matrix.perspectiveM(viewProjWeapon, 0, 56f, aspect, 0.03f, 5f)
 
         val isAds = sim.isAdsActiveForRender()
         val isReloading = sim.isReloadingForRender()
@@ -289,24 +306,27 @@ class FpsGLRenderer(
         val adsBlend = if (isAds) 1f else 0f
         val reloadDrop = if (isReloading) sin(reloadProgress * Math.PI.toFloat()) * 0.22f else 0f
         val bobPhase = sim.getWeaponBobPhase()
-        val bobAmp = if (isAds) 0.004f else 0.015f
+        val bobAmp = if (isAds) 0.0035f else 0.014f
         val bobX = cos(bobPhase) * bobAmp
         val bobY = sin(bobPhase * 2f) * bobAmp
         val recoilZ = sim.weaponRecoilOffset * 0.065f
         val recoilPitch = sim.weaponRecoilOffset * 7.5f
 
         val offsetX = Math3D.lerp(0.22f, 0.0f, adsBlend) + bobX
-        val offsetY = Math3D.lerp(-0.20f, -0.145f, adsBlend) - reloadDrop + bobY
-        val offsetZ = Math3D.lerp(-0.44f, -0.34f, adsBlend) + recoilZ
+        val offsetY = Math3D.lerp(-0.20f, -0.140f, adsBlend) - reloadDrop + bobY
+        val offsetZ = Math3D.lerp(-0.46f, -0.35f, adsBlend) + recoilZ
 
         GLES20.glUseProgram(worldShader.programId)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureAtlas.textureId)
+        GLES20.glUniform1i(worldShader.uAtlasTex, 0)
         GLES20.glUniform3f(worldShader.uCameraPos, 0f, 0f, 0f)
         GLES20.glUniform1f(worldShader.uFogDensity, 0f)
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
 
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.translateM(modelMatrix, 0, offsetX, offsetY, offsetZ)
-        Matrix.rotateM(modelMatrix, 0, recoilPitch - reloadDrop * 90f, 1f, 0f, 0f)
+        Matrix.rotateM(modelMatrix, 0, recoilPitch - reloadDrop * 85f, 1f, 0f, 0f)
         if (isSprinting) {
             Matrix.rotateM(modelMatrix, 0, -24f, 0f, 1f, 0f)
             Matrix.rotateM(modelMatrix, 0, -14f, 1f, 0f, 0f)
@@ -317,6 +337,7 @@ class FpsGLRenderer(
         GLES20.glUniformMatrix4fv(worldShader.uModelMatrix, 1, false, modelMatrix, 0)
 
         weaponMeshes[sim.activeWeaponId()]?.draw(worldShader)
+        playerArmsMesh?.draw(worldShader)
     }
 
     private fun drawMeshWithModel(mesh: GpuMesh?) {

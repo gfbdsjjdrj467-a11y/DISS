@@ -150,11 +150,17 @@ object MapCatalog {
         val boxes = mutableListOf<MapBox>()
         addPerimeter(boxes, half, 7.5f, 0.34f, 0.37f, 0.42f, 3)
 
-        // 4 Multi-story City Buildings creating central crossroads & side alleys
-        boxes += box(-24f, 0f, -24f, -10f, 9.5f, -10f, 0.44f, 0.39f, 0.36f, 3)
-        boxes += box(10f, 0f, -24f, 24f, 11.0f, -11f, 0.38f, 0.42f, 0.48f, 3)
-        boxes += box(-24f, 0f, 10f, -11f, 10.2f, 24f, 0.40f, 0.44f, 0.46f, 3)
-        boxes += box(11f, 0f, 11f, 24f, 8.8f, 24f, 0.48f, 0.42f, 0.38f, 3)
+        // 4 Multi-story City Buildings creating central crossroads & side alleys (mat 1 = brick + windows)
+        boxes += box(-24f, 0f, -24f, -10f, 9.5f, -10f, 0.56f, 0.44f, 0.38f, 1)
+        boxes += box(10f, 0f, -24f, 24f, 11.0f, -11f, 0.44f, 0.48f, 0.56f, 1)
+        boxes += box(-24f, 0f, 10f, -11f, 10.2f, 24f, 0.46f, 0.50f, 0.52f, 1)
+        boxes += box(11f, 0f, 11f, 24f, 8.8f, 24f, 0.58f, 0.48f, 0.42f, 1)
+
+        // Road lane markings (non-colliding thin floor strips)
+        for (i in -3..3) {
+            boxes += box(-0.35f, 0.004f, i * 8f - 1.8f, 0.35f, 0.015f, i * 8f + 1.8f, 0.88f, 0.84f, 0.62f, 0, collides = false, minimap = false)
+            boxes += box(i * 8f - 1.8f, 0.004f, -0.35f, i * 8f + 1.8f, 0.015f, 0.35f, 0.88f, 0.84f, 0.62f, 0, collides = false, minimap = false)
+        }
 
         // Shopfront awnings (visual overhangs)
         boxes += box(-10f, 3.0f, -22f, -8.5f, 3.3f, -12f, 0.72f, 0.24f, 0.22f, 2, collides = false, minimap = false)
@@ -196,7 +202,7 @@ object MapCatalog {
             halfExtent = half,
             floorSurface = SurfaceType.CONCRETE,
             floorColor = Triple(0.24f, 0.26f, 0.29f),
-            floorMatType = 1,
+            floorMatType = 0,
             skyTopColor = Triple(0.16f, 0.26f, 0.42f),
             skyHorizonColor = Triple(0.48f, 0.56f, 0.66f),
             fogColor = Triple(0.45f, 0.52f, 0.61f),
@@ -249,10 +255,10 @@ object MapCatalog {
         addPerimeter(boxes, half, 5.5f, 0.30f, 0.34f, 0.31f, 1)
 
         // Central Corridor Walls (leaving central doorways)
-        boxes += box(-18f, 0f, -6f, -3.5f, 4.2f, -4.8f, 0.36f, 0.40f, 0.37f, 1)
-        boxes += box(3.5f, 0f, -6f, 18f, 4.2f, -4.8f, 0.36f, 0.40f, 0.37f, 1)
-        boxes += box(-18f, 0f, 4.8f, -3.5f, 4.2f, 6f, 0.36f, 0.40f, 0.37f, 1)
-        boxes += box(3.5f, 0f, 4.8f, 18f, 4.2f, 6f, 0.36f, 0.40f, 0.37f, 1)
+        boxes += box(-18f, 0f, -6f, -3.5f, 4.2f, -4.8f, 0.42f, 0.46f, 0.44f, 0)
+        boxes += box(3.5f, 0f, -6f, 18f, 4.2f, -4.8f, 0.42f, 0.46f, 0.44f, 0)
+        boxes += box(-18f, 0f, 4.8f, -3.5f, 4.2f, 6f, 0.42f, 0.46f, 0.44f, 0)
+        boxes += box(3.5f, 0f, 4.8f, 18f, 4.2f, 6f, 0.42f, 0.46f, 0.44f, 0)
 
         // Barracks Partition Walls (North Wing)
         boxes += box(-9f, 0f, -22f, -7.8f, 3.8f, -11f, 0.38f, 0.42f, 0.40f, 1)
@@ -296,7 +302,7 @@ object MapCatalog {
             halfExtent = half,
             floorSurface = SurfaceType.METAL,
             floorColor = Triple(0.28f, 0.31f, 0.33f),
-            floorMatType = 2,
+            floorMatType = 0,
             skyTopColor = Triple(0.14f, 0.19f, 0.24f),
             skyHorizonColor = Triple(0.32f, 0.38f, 0.42f),
             fogColor = Triple(0.26f, 0.31f, 0.35f),
@@ -368,8 +374,8 @@ object MapCatalog {
         boxes += box(-5.5f, -0.05f, -5.5f, 5.5f, 0.04f, 5.5f, 0.60f, 0.82f, 0.95f, 6, collides = false, minimap = false)
 
         // Stone & Snow Cover Walls around village square
-        boxes += box(-8f, 0f, -2f, -6.8f, 1.35f, 3f, 0.54f, 0.58f, 0.64f, 1)
-        boxes += box(6.8f, 0f, -3f, 8f, 1.35f, 2f, 0.54f, 0.58f, 0.64f, 1)
+        boxes += box(-8f, 0f, -2f, -6.8f, 1.35f, 3f, 0.56f, 0.60f, 0.66f, 0)
+        boxes += box(6.8f, 0f, -3f, 8f, 1.35f, 2f, 0.56f, 0.60f, 0.66f, 0)
         boxes += box(-3f, 0f, -9f, 3f, 1.25f, -7.8f, 0.84f, 0.89f, 0.95f, 6)
         boxes += box(-3f, 0f, 7.8f, 3f, 1.25f, 9f, 0.84f, 0.89f, 0.95f, 6)
 

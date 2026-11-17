@@ -21,6 +21,7 @@ import javax.microedition.khronos.opengles.GL10
 
 class WeaponPreviewRenderer : GLSurfaceView.Renderer {
     private lateinit var shader: TacticalWorldShader
+    private val textureAtlas = TacticalTextureAtlas()
     private val meshes = HashMap<WeaponId, GpuMesh>()
 
     @Volatile var activeWeapon: WeaponId = WeaponId.AR_M4A1
@@ -39,6 +40,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         GLES20.glEnable(GLES20.GL_CULL_FACE)
         shader = TacticalWorldShader()
+        textureAtlas.createAndUpload()
         meshes.clear()
         for (id in WeaponId.entries) {
             meshes[id] = TacticalMeshes.buildWeaponMesh(id)
@@ -49,7 +51,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         val w = width.coerceAtLeast(1)
         val h = height.coerceAtLeast(1)
         GLES20.glViewport(0, 0, w, h)
-        Matrix.perspectiveM(proj, 0, 42f, w.toFloat() / h.toFloat(), 0.05f, 20f)
+        Matrix.perspectiveM(proj, 0, 40f, w.toFloat() / h.toFloat(), 0.05f, 20f)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -58,19 +60,23 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         lastNs = now
         autoYaw = (autoYaw + dt * 26f) % 360f
 
-        GLES20.glClearColor(0.07f, 0.10f, 0.14f, 1f)
+        GLES20.glClearColor(0.06f, 0.09f, 0.13f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        Matrix.setLookAtM(view, 0, 0f, 0.14f, 1.05f, 0f, 0.02f, 0f, 0f, 1f, 0f)
+        Matrix.setLookAtM(view, 0, 0f, 0.12f, 0.96f, 0f, 0.01f, 0f, 0f, 1f, 0f)
         Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
 
         GLES20.glUseProgram(shader.programId)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureAtlas.textureId)
+        GLES20.glUniform1i(shader.uAtlasTex, 0)
+
         GLES20.glUniform3f(shader.uSunDir, 0.5f, 0.8f, 0.6f)
         GLES20.glUniform3f(shader.uSunColor, 1.0f, 0.96f, 0.90f)
-        GLES20.glUniform3f(shader.uAmbientColor, 0.45f, 0.50f, 0.58f)
-        GLES20.glUniform3f(shader.uFogColor, 0.07f, 0.10f, 0.14f)
+        GLES20.glUniform3f(shader.uAmbientColor, 0.48f, 0.53f, 0.62f)
+        GLES20.glUniform3f(shader.uFogColor, 0.06f, 0.09f, 0.13f)
         GLES20.glUniform1f(shader.uFogDensity, 0f)
-        GLES20.glUniform3f(shader.uCameraPos, 0f, 0.14f, 1.05f)
+        GLES20.glUniform3f(shader.uCameraPos, 0f, 0.12f, 0.96f)
         GLES20.glUniform1f(shader.uMuzzleIntensity, 0f)
         GLES20.glUniform1i(shader.uDetailLevel, 2)
         GLES20.glUniform4f(shader.uTintOverride, 0f, 0f, 0f, 0f)
@@ -78,7 +84,12 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         Matrix.setIdentityM(model, 0)
         Matrix.rotateM(model, 0, userPitchOffset.coerceIn(-45f, 45f), 1f, 0f, 0f)
         Matrix.rotateM(model, 0, 65f + autoYaw + userYawOffset, 0f, 1f, 0f)
-        val scale = if (activeWeapon == WeaponId.SNIPER_AWP) 0.72f else if (activeWeapon == WeaponId.PISTOL_P9) 1.55f else 1.05f
+        val scale = when (activeWeapon) {
+            WeaponId.SNIPER_AWP -> 0.66f
+            WeaponId.PISTOL_P9 -> 1.50f
+            WeaponId.LMG_M249 -> 0.86f
+            else -> 1.02f
+        }
         Matrix.scaleM(model, 0, scale, scale, scale)
 
         Matrix.multiplyMM(mvp, 0, vp, 0, model, 0)
