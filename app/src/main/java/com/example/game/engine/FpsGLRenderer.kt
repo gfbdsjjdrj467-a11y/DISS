@@ -145,18 +145,23 @@ class FpsGLRenderer(
         GLES20.glUniform3f(worldShader.uCameraPos, eye.x, eye.y, eye.z)
 
         val dynLight = if (sim.settings.graphicsQuality.dynamicLightsEnabled) sim.muzzleFlashIntensity else 0f
+        val shaderTime = ((now / 1_000_000_000.0) % 1000.0).toFloat()
         GLES20.glUniform3f(worldShader.uMuzzlePos, sim.muzzleFlashPos.x, sim.muzzleFlashPos.y, sim.muzzleFlashPos.z)
         GLES20.glUniform1f(worldShader.uMuzzleIntensity, dynLight)
         GLES20.glUniform1i(worldShader.uDetailLevel, sim.settings.graphicsQuality.surfaceDetailLevel)
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
+        GLES20.glUniform1f(worldShader.uTime, shaderTime)
+        GLES20.glUniform1i(worldShader.uSkinMode, 0)
 
-        // Draw Gradient Sky Dome + Sun Disc behind world
+        // Draw Gradient Sky Dome + Animated Clouds + Sun Disc behind world
         GLES20.glDepthMask(false)
         GLES20.glDisable(GLES20.GL_CULL_FACE)
+        GLES20.glUniform1i(worldShader.uIsSky, 1)
         GLES20.glUniform1f(worldShader.uFogDensity, 0f)
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.translateM(modelMatrix, 0, eye.x, -4f, eye.z)
         drawMeshWithModel(skyMesh)
+        GLES20.glUniform1i(worldShader.uIsSky, 0)
         GLES20.glUniform1f(worldShader.uFogDensity, map.fogDensity)
         GLES20.glEnable(GLES20.GL_CULL_FACE)
         GLES20.glDepthMask(true)
@@ -193,14 +198,14 @@ class FpsGLRenderer(
             drawBot(b, dist)
         }
 
-        // Draw Particles & Bullet Tracers
+        // Draw Particles & Bullet Tracers & Brass Shell Casings
         val camRight = Vec3(viewMatrix[0], viewMatrix[4], viewMatrix[8]).normalized()
         val camUp = Vec3(viewMatrix[1], viewMatrix[5], viewMatrix[9]).normalized()
         sim.particlePool.render(particleShader, vpMatrix, camRight, camUp)
 
-        // Draw First-Person Tactical Arms + Detailed Weapon Viewmodel
+        // Draw First-Person Tactical Arms + Skinned Weapon Viewmodel
         if (!sim.isShowcaseMode && sim.isActiveWeaponVisible()) {
-            drawFirstPersonWeapon(aspect)
+            drawFirstPersonWeapon(aspect, shaderTime)
         }
 
         fpsFrames++
@@ -294,7 +299,7 @@ class FpsGLRenderer(
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
     }
 
-    private fun drawFirstPersonWeapon(aspect: Float) {
+    private fun drawFirstPersonWeapon(aspect: Float, shaderTime: Float) {
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT)
         val viewProjWeapon = FloatArray(16)
         Matrix.perspectiveM(viewProjWeapon, 0, 56f, aspect, 0.03f, 5f)
@@ -323,6 +328,8 @@ class FpsGLRenderer(
         GLES20.glUniform3f(worldShader.uCameraPos, 0f, 0f, 0f)
         GLES20.glUniform1f(worldShader.uFogDensity, 0f)
         GLES20.glUniform4f(worldShader.uTintOverride, 0f, 0f, 0f, 0f)
+        GLES20.glUniform1f(worldShader.uTime, shaderTime)
+        GLES20.glUniform1i(worldShader.uIsSky, 0)
 
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.translateM(modelMatrix, 0, offsetX, offsetY, offsetZ)
@@ -336,7 +343,13 @@ class FpsGLRenderer(
         GLES20.glUniformMatrix4fv(worldShader.uMvpMatrix, 1, false, mvpMatrix, 0)
         GLES20.glUniformMatrix4fv(worldShader.uModelMatrix, 1, false, modelMatrix, 0)
 
+        val skin = sim.activeWeaponSkin()
+        GLES20.glUniform1i(worldShader.uSkinMode, skin.shaderMode)
+        GLES20.glUniform3f(worldShader.uSkinPrimary, skin.primaryColor.first, skin.primaryColor.second, skin.primaryColor.third)
+        GLES20.glUniform3f(worldShader.uSkinSecondary, skin.secondaryColor.first, skin.secondaryColor.second, skin.secondaryColor.third)
         weaponMeshes[sim.activeWeaponId()]?.draw(worldShader)
+
+        GLES20.glUniform1i(worldShader.uSkinMode, 0)
         playerArmsMesh?.draw(worldShader)
     }
 

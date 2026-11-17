@@ -16,6 +16,7 @@ import com.example.game.model.HudState
 import com.example.game.model.MapId
 import com.example.game.model.MatchResultSummary
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +80,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch {
+            careerStats.collect { stats ->
+                simulation.currentPlayerRp = stats.rankPoints
+            }
+        }
     }
 
     fun onHudSnapshot(snapshot: HudState) {
@@ -95,7 +101,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startMatch() {
         soundEngine.playUiClick()
         recordedResultIds.clear()
+        simulation.currentPlayerRp = careerStats.value.rankPoints
         simulation.startMatch(settings.value)
+        _hudState.value = simulation.snapshotHud(60)
+        _route.value = AppRoute.IN_GAME
+        soundEngine.setMenuMusicPaused(true)
+    }
+
+    fun startRanked2v2Match() {
+        soundEngine.playUiClick()
+        val rankedSettings = settings.value.copy(selectedMode = GameModeType.RANKED_2V2)
+        updateSettings { it.copy(selectedMode = GameModeType.RANKED_2V2) }
+        recordedResultIds.clear()
+        simulation.currentPlayerRp = careerStats.value.rankPoints
+        simulation.startMatch(rankedSettings)
         _hudState.value = simulation.snapshotHud(60)
         _route.value = AppRoute.IN_GAME
         soundEngine.setMenuMusicPaused(true)
@@ -104,6 +123,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun restartMatch() {
         soundEngine.playUiClick()
         recordedResultIds.clear()
+        simulation.currentPlayerRp = careerStats.value.rankPoints
         simulation.startMatch(settings.value)
         _hudState.value = simulation.snapshotHud(60)
     }
@@ -133,6 +153,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setBotCount(count: Int) = updateSettings { it.copy(botCount = count.coerceIn(2, 12)) }
     fun equipPrimaryWeapon(id: WeaponId) = updateSettings { it.copy(primaryWeapon = id) }
     fun equipSecondaryWeapon(id: WeaponId) = updateSettings { it.copy(secondaryWeapon = id) }
+    fun equipWeaponSkin(id: WeaponId, skin: WeaponSkin) = updateSettings { s ->
+        s.copy(weaponSkins = s.weaponSkins + (id to skin))
+    }
 
     fun applyGraphicsPreset(q: GraphicsQuality) = updateSettings {
         when (q) {

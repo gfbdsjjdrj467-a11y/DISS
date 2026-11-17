@@ -74,8 +74,10 @@ import com.example.game.model.GameModeType
 import com.example.game.model.GameSettings
 import com.example.game.model.HudState
 import com.example.game.model.MatchResultSummary
+import com.example.game.model.RankSystem
 import com.example.game.model.WeaponCatalog
 import com.example.game.model.WeaponId
+import com.example.ui.components.RankEmblemCanvas
 import com.example.ui.theme.AlertCrimson
 import com.example.ui.theme.AlphaBlue
 import com.example.ui.theme.BravoRed
@@ -450,7 +452,10 @@ fun GameHudOverlay(
                     Text("ВЫ ВЫБЫЛИ ИЗ СТРОЯ", style = MaterialTheme.typography.headlineLarge, color = AlertCrimson)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = if (hud.mapMode == GameModeType.ELIMINATION || hud.mapMode == GameModeType.SURVIVAL) {
+                        text = if (hud.mapMode == GameModeType.ELIMINATION ||
+                            hud.mapMode == GameModeType.RANKED_2V2 ||
+                            hud.mapMode == GameModeType.SURVIVAL
+                        ) {
                             "Ожидание окончания раунда..."
                         } else {
                             "Возрождение через ${String.format("%.1f", hud.respawnSecondsLeft)}с"
@@ -646,6 +651,19 @@ private fun TopMatchScoreboard(hud: HudState, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             when (hud.mapMode) {
+                GameModeType.RANKED_2V2 -> {
+                    val mins = hud.matchTimeRemainingSec / 60
+                    val secs = hud.matchTimeRemainingSec % 60
+                    val alphaDots = "●".repeat(hud.aliveAlpha.coerceIn(0, 2)) + "○".repeat((2 - hud.aliveAlpha).coerceIn(0, 2))
+                    val bravoDots = "●".repeat(hud.aliveBravo.coerceIn(0, 2)) + "○".repeat((2 - hud.aliveBravo).coerceIn(0, 2))
+                    Text("ALPHA $alphaDots ${hud.scoreAlpha}", style = MaterialTheme.typography.labelLarge, color = AlphaBlue)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("2x2 НА ЗВАНИЕ", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                        Text("R${hud.roundNumber}/${hud.totalRounds} • %02d:%02d".format(mins, secs), style = MaterialTheme.typography.labelLarge, color = TextPrimary)
+                    }
+                    Text("${hud.scoreBravo} $bravoDots BRAVO", style = MaterialTheme.typography.labelLarge, color = BravoRed)
+                }
+
                 GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION -> {
                     Text("ALPHA ${hud.scoreAlpha}", style = MaterialTheme.typography.labelLarge, color = AlphaBlue)
                     val mins = hud.matchTimeRemainingSec / 60
@@ -710,7 +728,7 @@ private fun BottomVitalsAndAmmoBar(hud: HudState, modifier: Modifier = Modifier)
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(wSpec.name, style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                Text("${wSpec.name} • ${hud.activeWeaponSkin.displayName}", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
                 Text("${hud.ammoInMag} / ${hud.ammoReserve}", style = MaterialTheme.typography.titleLarge, color = TextPrimary)
             }
         }
@@ -936,6 +954,53 @@ private fun MatchResultOverlay(
                     color = if (summary.victory) EmeraldSuccess else AlertCrimson
                 )
                 Text(summary.subtitle, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+
+                if (summary.mode == GameModeType.RANKED_2V2) {
+                    val beforeProg = RankSystem.progressForRp(summary.rpBefore)
+                    val afterProg = RankSystem.progressForRp(summary.rpAfter)
+                    val tierColor = Color(afterProg.tier.primaryHex)
+                    val deltaSign = if (summary.rankDelta >= 0) "+" else ""
+                    val statusTag = when {
+                        afterProg.tier.ordinal > beforeProg.tier.ordinal -> "ПОВЫШЕНИЕ РАНГА!"
+                        afterProg.tier.ordinal < beforeProg.tier.ordinal -> "ПОНИЖЕНИЕ РАНГА"
+                        else -> "РАНГОВЫЙ РЕЙТИНГ"
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = GunmetalCard,
+                        border = BorderStroke(1.dp, tierColor.copy(alpha = 0.7f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RankEmblemCanvas(tier = afterProg.tier, sizeDp = 42.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(statusTag, style = MaterialTheme.typography.labelSmall, color = TacticalCyan)
+                                    Text(
+                                        text = "$deltaSign${summary.rankDelta} RP",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (summary.rankDelta >= 0) EmeraldSuccess else AlertCrimson
+                                    )
+                                }
+                                Text("${afterProg.fullTitle} • ${summary.rpAfter} RP", style = MaterialTheme.typography.titleMedium, color = tierColor)
+                                Spacer(Modifier.height(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { afterProg.progressInTier.coerceIn(0.05f, 1f) },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = tierColor,
+                                    trackColor = ObsidianBg
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

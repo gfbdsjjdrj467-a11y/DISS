@@ -16,6 +16,7 @@ import com.example.game.model.GraphicsQuality
 import com.example.game.model.HudControlOffsets
 import com.example.game.model.MapId
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -75,6 +76,8 @@ class SettingsRepository(private val context: Context) {
         val SELECTED_MODE = stringPreferencesKey("selected_mode")
         val PRIMARY_WEAPON = stringPreferencesKey("primary_weapon")
         val SECONDARY_WEAPON = stringPreferencesKey("secondary_weapon")
+
+        fun skinKey(weaponId: WeaponId) = stringPreferencesKey("skin_${weaponId.name}")
     }
 
     val settingsFlow: Flow<GameSettings> = context.settingsDataStore.data
@@ -129,7 +132,10 @@ class SettingsRepository(private val context: Context) {
                 selectedMap = enumValueOrDefault(prefs[Keys.SELECTED_MAP], MapId.DESERT_BASE),
                 selectedMode = enumValueOrDefault(prefs[Keys.SELECTED_MODE], GameModeType.TEAM_DEATHMATCH),
                 primaryWeapon = enumValueOrDefault(prefs[Keys.PRIMARY_WEAPON], WeaponId.AR_M4A1),
-                secondaryWeapon = enumValueOrDefault(prefs[Keys.SECONDARY_WEAPON], WeaponId.PISTOL_P9)
+                secondaryWeapon = enumValueOrDefault(prefs[Keys.SECONDARY_WEAPON], WeaponId.PISTOL_P9),
+                weaponSkins = WeaponId.entries.associateWith { wId ->
+                    enumValueOrDefault(prefs[Keys.skinKey(wId)], WeaponSkin.FACTORY_STOCK)
+                }
             )
         }
 
@@ -181,7 +187,10 @@ class SettingsRepository(private val context: Context) {
                 selectedMap = enumValueOrDefault(prefs[Keys.SELECTED_MAP], MapId.DESERT_BASE),
                 selectedMode = enumValueOrDefault(prefs[Keys.SELECTED_MODE], GameModeType.TEAM_DEATHMATCH),
                 primaryWeapon = enumValueOrDefault(prefs[Keys.PRIMARY_WEAPON], WeaponId.AR_M4A1),
-                secondaryWeapon = enumValueOrDefault(prefs[Keys.SECONDARY_WEAPON], WeaponId.PISTOL_P9)
+                secondaryWeapon = enumValueOrDefault(prefs[Keys.SECONDARY_WEAPON], WeaponId.PISTOL_P9),
+                weaponSkins = WeaponId.entries.associateWith { wId ->
+                    enumValueOrDefault(prefs[Keys.skinKey(wId)], WeaponSkin.FACTORY_STOCK)
+                }
             )
             val next = transform(current)
             prefs[Keys.GRAPHICS_QUALITY] = next.graphicsQuality.name
@@ -228,6 +237,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SELECTED_MODE] = next.selectedMode.name
             prefs[Keys.PRIMARY_WEAPON] = next.primaryWeapon.name
             prefs[Keys.SECONDARY_WEAPON] = next.secondaryWeapon.name
+            for (wId in WeaponId.entries) {
+                prefs[Keys.skinKey(wId)] = (next.weaponSkins[wId] ?: WeaponSkin.FACTORY_STOCK).name
+            }
         }
     }
 

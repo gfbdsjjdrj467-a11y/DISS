@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
@@ -51,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -58,6 +60,7 @@ import com.example.data.CareerStatsEntity
 import com.example.game.model.GameSettings
 import com.example.game.model.WeaponCatalog
 import com.example.ui.AppRoute
+import com.example.ui.components.RankBadgePill
 import com.example.ui.theme.AlphaBlue
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.GunmetalCard
@@ -74,10 +77,12 @@ fun MainMenuScreen(
     settings: GameSettings,
     careerStats: CareerStatsEntity,
     onPlayClick: () -> Unit,
+    onPlayRankedClick: () -> Unit,
     onNavigate: (AppRoute) -> Unit
 ) {
     val context = LocalContext.current
     val primaryWeapon = WeaponCatalog.byId(settings.primaryWeapon)
+    val activeSkin = settings.skinFor(settings.primaryWeapon)
 
     Box(
         modifier = Modifier
@@ -168,6 +173,29 @@ fun MainMenuScreen(
 
                 Spacer(Modifier.height(8.dp))
 
+                Button(
+                    onClick = onPlayRankedClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("menu_play_ranked_button"),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = TacticalCyan.copy(alpha = 0.22f),
+                        contentColor = TacticalCyan
+                    ),
+                    border = BorderStroke(1.5.dp, TacticalCyan)
+                ) {
+                    Icon(Icons.Filled.EmojiEvents, contentDescription = "2x2 На звание", modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "2x2 НА ЗВАНИЕ",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
                 MenuActionButton(
                     label = "ВЫБОР КАРТЫ",
                     icon = Icons.Filled.Map,
@@ -209,14 +237,16 @@ fun MainMenuScreen(
                 )
             }
 
-            // Right Tactical Deployment Card over live 3D Polygon
+            // Right Tactical Deployment Card + Rank Badge over live 3D Polygon
             Column(
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(310.dp)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.Bottom,
+                verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End
             ) {
+                RankBadgePill(rp = careerStats.rankPoints)
+
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = SteelSurface.copy(alpha = 0.86f),
@@ -271,7 +301,23 @@ fun MainMenuScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            BriefStatChip("ОРУЖИЕ", primaryWeapon.name, StrikeAmber)
+                            Column(modifier = Modifier.weight(1.3f)) {
+                                Text(text = "ОРУЖИЕ И СКИН", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                                Text(
+                                    text = primaryWeapon.name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = StrikeAmber,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = activeSkin.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TacticalCyan,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             BriefStatChip("БОТЫ", "${settings.botCount}", AlphaBlue)
                             BriefStatChip("K/D", String.format("%.2f", careerStats.kdRatio), EmeraldSuccess)
                         }

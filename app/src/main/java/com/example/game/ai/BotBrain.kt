@@ -122,7 +122,7 @@ class BotBrain(
             bot.lastKnownTargetPos = visibleTargetPos
 
             // Share tactical callout with squadmates in team modes & Expert/Hard
-            if (mode == GameModeType.TEAM_DEATHMATCH || mode == GameModeType.ELIMINATION) {
+            if (mode == GameModeType.TEAM_DEATHMATCH || mode == GameModeType.ELIMINATION || mode == GameModeType.RANKED_2V2) {
                 if (bot.team == Team.ALPHA) {
                     alphaCalloutPos = visibleTargetPos
                     alphaCalloutTimer = 4.5f
@@ -329,7 +329,7 @@ class BotBrain(
         // Check human player
         val isPlayerEnemy = playerAlive && when (mode) {
             GameModeType.FREE_FOR_ALL, GameModeType.SURVIVAL -> true
-            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION -> bot.team != playerTeam
+            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION, GameModeType.RANKED_2V2 -> bot.team != playerTeam
             GameModeType.PRACTICE -> false
         }
 
@@ -343,8 +343,8 @@ class BotBrain(
             }
         }
 
-        // Check other bots (for TDM / Elimination / FFA)
-        if (mode == GameModeType.TEAM_DEATHMATCH || mode == GameModeType.ELIMINATION || mode == GameModeType.FREE_FOR_ALL) {
+        // Check other bots (for TDM / Elimination / Ranked 2v2 / FFA)
+        if (mode == GameModeType.TEAM_DEATHMATCH || mode == GameModeType.ELIMINATION || mode == GameModeType.RANKED_2V2 || mode == GameModeType.FREE_FOR_ALL) {
             for (other in allBots) {
                 if (other.id == bot.id || !other.isAlive) continue
                 val enemy = if (mode == GameModeType.FREE_FOR_ALL) true else other.team != bot.team

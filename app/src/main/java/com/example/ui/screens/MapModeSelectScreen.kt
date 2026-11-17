@@ -46,10 +46,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.data.CareerStatsEntity
 import com.example.game.model.BotDifficulty
 import com.example.game.model.GameModeType
 import com.example.game.model.GameSettings
 import com.example.game.model.MapId
+import com.example.game.model.RankSystem
+import com.example.ui.components.RankBadgePill
+import com.example.ui.components.RankProgressCard
 import com.example.ui.theme.GunmetalCard
 import com.example.ui.theme.GunmetalElevated
 import com.example.ui.theme.ObsidianBg
@@ -63,6 +67,7 @@ import com.example.ui.theme.TextSecondary
 @Composable
 fun MapModeSelectScreen(
     settings: GameSettings,
+    careerStats: CareerStatsEntity,
     onSelectMap: (MapId) -> Unit,
     onSelectMode: (GameModeType) -> Unit,
     onSelectDifficulty: (BotDifficulty) -> Unit,
@@ -95,9 +100,11 @@ fun MapModeSelectScreen(
                 Spacer(Modifier.width(6.dp))
                 Column {
                     Text("ВЫБОР КАРТЫ И РЕЖИМА", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
-                    Text("5 уникальных локаций • 5 боевых режимов", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                    Text("5 локаций • 6 режимов включая 2x2 На звание", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
                 }
             }
+
+            RankBadgePill(rp = careerStats.rankPoints)
 
             Button(
                 onClick = onStartMatch,
@@ -205,38 +212,59 @@ fun MapModeSelectScreen(
                     }
 
                     Spacer(Modifier.height(8.dp))
-                    Text("СЛОЖНОСТЬ БОТОВ", style = MaterialTheme.typography.labelLarge, color = TacticalCyan)
-                    Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (diff in BotDifficulty.entries) {
-                            val selected = diff == settings.botDifficulty
-                            FilterChip(
-                                selected = selected,
-                                onClick = { onSelectDifficulty(diff) },
-                                label = { Text(diff.displayName, style = MaterialTheme.typography.labelSmall) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = StrikeAmber,
-                                    selectedLabelColor = ObsidianBg
+                    if (settings.selectedMode == GameModeType.RANKED_2V2) {
+                        val tier = RankSystem.tierForRp(careerStats.rankPoints)
+                        RankProgressCard(rp = careerStats.rankPoints)
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GunmetalCard,
+                            border = BorderStroke(1.dp, TacticalCyan.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("ФОРМАТ: 2 ALPHA VS 2 BRAVO • ДО 5 РАУНДОВ", style = MaterialTheme.typography.labelLarge, color = TacticalCyan)
+                                Text(
+                                    "Соперники подбираются под ваше звание (${tier.displayName} → ${tier.matchedBotDifficulty.displayName}). Побеждайте, чтобы дойти до Легенды!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary
                                 )
-                            )
+                            }
                         }
-                    }
+                    } else {
+                        Text("СЛОЖНОСТЬ БОТОВ", style = MaterialTheme.typography.labelLarge, color = TacticalCyan)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (diff in BotDifficulty.entries) {
+                                val selected = diff == settings.botDifficulty
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onSelectDifficulty(diff) },
+                                    label = { Text(diff.displayName, style = MaterialTheme.typography.labelSmall) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = StrikeAmber,
+                                        selectedLabelColor = ObsidianBg
+                                    )
+                                )
+                            }
+                        }
 
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("КОЛИЧЕСТВО БОТОВ", style = MaterialTheme.typography.labelLarge, color = TextPrimary)
-                        Text("${settings.botCount}", style = MaterialTheme.typography.labelLarge, color = StrikeAmber)
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("КОЛИЧЕСТВО БОТОВ", style = MaterialTheme.typography.labelLarge, color = TextPrimary)
+                            Text("${settings.botCount}", style = MaterialTheme.typography.labelLarge, color = StrikeAmber)
+                        }
+                        Slider(
+                            value = settings.botCount.toFloat(),
+                            onValueChange = { onSetBotCount(it.toInt()) },
+                            valueRange = 2f..12f,
+                            steps = 9,
+                            colors = SliderDefaults.colors(thumbColor = StrikeAmber, activeTrackColor = StrikeAmber)
+                        )
                     }
-                    Slider(
-                        value = settings.botCount.toFloat(),
-                        onValueChange = { onSetBotCount(it.toInt()) },
-                        valueRange = 2f..12f,
-                        steps = 9,
-                        colors = SliderDefaults.colors(thumbColor = StrikeAmber, activeTrackColor = StrikeAmber)
-                    )
                 }
             }
         }

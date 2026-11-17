@@ -20,12 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -43,15 +45,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.CareerStatsEntity
 import com.example.game.engine.WeaponPreviewGLView
 import com.example.game.model.GameSettings
+import com.example.game.model.RankSystem
 import com.example.game.model.WeaponCatalog
 import com.example.game.model.WeaponCategory
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.GunmetalCard
 import com.example.ui.theme.GunmetalElevated
@@ -69,6 +75,7 @@ fun ArsenalScreen(
     careerStats: CareerStatsEntity,
     onEquipPrimary: (WeaponId) -> Unit,
     onEquipSecondary: (WeaponId) -> Unit,
+    onEquipSkin: (WeaponId, WeaponSkin) -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
@@ -78,6 +85,8 @@ fun ArsenalScreen(
     val isUnlocked = careerStats.totalKills >= inspectedSpec.unlockKillsRequired
     val isPrimary = settings.primaryWeapon == inspectedWeaponId
     val isSecondary = settings.secondaryWeapon == inspectedWeaponId
+    val equippedSkin = settings.skinFor(inspectedWeaponId)
+    val currentRank = RankSystem.tierForRp(careerStats.rankPoints)
 
     Column(
         modifier = Modifier
@@ -97,12 +106,12 @@ fun ArsenalScreen(
                 }
                 Spacer(Modifier.width(6.dp))
                 Column {
-                    Text("АРСЕНАЛ И 3D-ОСМОТР", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
-                    Text("6 классов вооружения • Вращайте 3D-модель свайпом", style = MaterialTheme.typography.labelSmall, color = TacticalCyan)
+                    Text("АРСЕНАЛ И СКИНЫ", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
+                    Text("6 классов • 8 3D-скинов • Вращайте свайпом", style = MaterialTheme.typography.labelSmall, color = TacticalCyan)
                 }
             }
             Text(
-                text = "ФРАГИ: ${careerStats.totalKills}",
+                text = "ФРАГИ: ${careerStats.totalKills} • ${currentRank.displayName.uppercase()}",
                 style = MaterialTheme.typography.labelLarge,
                 color = StrikeAmber
             )
@@ -116,12 +125,13 @@ fun ArsenalScreen(
         ) {
             // Left: Weapon Roster
             LazyColumn(
-                modifier = Modifier.weight(0.95f).fillMaxHeight(),
+                modifier = Modifier.weight(0.88f).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(WeaponCatalog.allWeapons) { w ->
                     val selected = w.id == inspectedWeaponId
                     val unlocked = careerStats.totalKills >= w.unlockKillsRequired
+                    val wSkin = settings.skinFor(w.id)
                     val equippedTag = when {
                         settings.primaryWeapon == w.id -> "ОСНОВНОЕ"
                         settings.secondaryWeapon == w.id -> "ДОП."
@@ -143,7 +153,7 @@ fun ArsenalScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(w.name, style = MaterialTheme.typography.titleLarge, color = TextPrimary)
-                                Text(w.category.displayName, style = MaterialTheme.typography.labelSmall, color = TacticalCyan)
+                                Text("${w.category.displayName} • ${wSkin.displayName}", style = MaterialTheme.typography.labelSmall, color = TacticalCyan, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             if (!unlocked) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -169,15 +179,15 @@ fun ArsenalScreen(
                 }
             }
 
-            // Right: 3D Preview + Stat Bars + Equip Actions
+            // Right: 3D Preview + Stat Bars + Skins + Equip Actions
             Surface(
-                modifier = Modifier.weight(1.25f).fillMaxHeight(),
+                modifier = Modifier.weight(1.32f).fillMaxHeight(),
                 shape = RoundedCornerShape(12.dp),
                 color = SteelSurface,
                 border = BorderStroke(1.dp, TacticalBorder)
             ) {
-                Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
-                    // 3D OpenGL Weapon Model Box
+                Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                    // 3D OpenGL Weapon Model Box with Active Shader Skin
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -187,6 +197,7 @@ fun ArsenalScreen(
                     ) {
                         WeaponPreviewGLView(
                             weaponId = inspectedWeaponId,
+                            skin = equippedSkin,
                             modifier = Modifier.fillMaxSize()
                         )
                         Text(
@@ -197,15 +208,13 @@ fun ArsenalScreen(
                         )
                         Column(modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
                             Text(inspectedSpec.name, style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
-                            Text(inspectedSpec.category.displayName, style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                            Text("${inspectedSpec.category.displayName} • ${equippedSkin.displayName}", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
                         }
                     }
 
-                    Spacer(Modifier.height(8.dp))
-                    Text(inspectedSpec.description, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Column(modifier = Modifier.weight(1f)) {
                             StatBar("УРОН", (inspectedSpec.damage * inspectedSpec.pellets).coerceAtMost(130) / 130f, "${inspectedSpec.damage}${if (inspectedSpec.pellets > 1) "x${inspectedSpec.pellets}" else ""}")
                             StatBar("ТЕМП", inspectedSpec.rpm / 900f, "${inspectedSpec.rpm.toInt()} RPM")
@@ -216,7 +225,75 @@ fun ArsenalScreen(
                         }
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    // Weapon Skin Swatches Strip
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.Palette, contentDescription = null, tint = TacticalCyan, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("СКИНЫ ОРУЖИЯ", style = MaterialTheme.typography.labelSmall, color = TacticalCyan)
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        items(WeaponSkin.entries) { skin ->
+                            val skinSelected = skin == equippedSkin
+                            val skinUnlocked = skin.isUnlocked(careerStats.totalKills, currentRank)
+                            val c1 = Color(skin.previewHex)
+                            val c2 = Color(skin.previewAccentHex)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (skinSelected) GunmetalElevated else GunmetalCard,
+                                border = BorderStroke(if (skinSelected) 2.dp else 1.dp, if (skinSelected) StrikeAmber else TacticalBorder),
+                                modifier = Modifier
+                                    .width(126.dp)
+                                    .height(50.dp)
+                                    .testTag("skin_card_${skin.name.lowercase()}")
+                                    .clickable(enabled = skinUnlocked) {
+                                        onEquipSkin(inspectedWeaponId, skin)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(Brush.linearGradient(listOf(c1, c2))),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!skinUnlocked) {
+                                            Icon(Icons.Filled.Lock, contentDescription = "Закрыто", tint = Color.White, modifier = Modifier.size(12.dp))
+                                        } else if (skinSelected) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Выбрано", tint = Color.White, modifier = Modifier.size(13.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = skin.displayName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (skinUnlocked) TextPrimary else TextSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (skinUnlocked) (if (skinSelected) "Надет" else "Открыт") else "${skin.unlockKills}уб/${skin.unlockRank.displayName}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (skinSelected) EmeraldSuccess else StrikeAmber,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(

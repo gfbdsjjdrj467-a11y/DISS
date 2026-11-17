@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -25,6 +26,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
     private val meshes = HashMap<WeaponId, GpuMesh>()
 
     @Volatile var activeWeapon: WeaponId = WeaponId.AR_M4A1
+    @Volatile var activeSkin: WeaponSkin = WeaponSkin.FACTORY_STOCK
     @Volatile var userYawOffset: Float = 0f
     @Volatile var userPitchOffset: Float = 12f
 
@@ -34,6 +36,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
     private val vp = FloatArray(16)
     private val mvp = FloatArray(16)
     private var autoYaw = 0f
+    private var elapsedSec = 0f
     private var lastNs = System.nanoTime()
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -59,6 +62,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         val dt = ((now - lastNs) / 1_000_000_000.0).toFloat().coerceIn(0.001f, 0.05f)
         lastNs = now
         autoYaw = (autoYaw + dt * 26f) % 360f
+        elapsedSec = (elapsedSec + dt) % 1000f
 
         GLES20.glClearColor(0.06f, 0.09f, 0.13f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
@@ -80,6 +84,13 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(shader.uMuzzleIntensity, 0f)
         GLES20.glUniform1i(shader.uDetailLevel, 2)
         GLES20.glUniform4f(shader.uTintOverride, 0f, 0f, 0f, 0f)
+        GLES20.glUniform1f(shader.uTime, elapsedSec)
+        GLES20.glUniform1i(shader.uIsSky, 0)
+
+        val skin = activeSkin
+        GLES20.glUniform1i(shader.uSkinMode, skin.shaderMode)
+        GLES20.glUniform3f(shader.uSkinPrimary, skin.primaryColor.first, skin.primaryColor.second, skin.primaryColor.third)
+        GLES20.glUniform3f(shader.uSkinSecondary, skin.secondaryColor.first, skin.secondaryColor.second, skin.secondaryColor.third)
 
         Matrix.setIdentityM(model, 0)
         Matrix.rotateM(model, 0, userPitchOffset.coerceIn(-45f, 45f), 1f, 0f, 0f)
@@ -103,6 +114,7 @@ class WeaponPreviewRenderer : GLSurfaceView.Renderer {
 @Composable
 fun WeaponPreviewGLView(
     weaponId: WeaponId,
+    skin: WeaponSkin = WeaponSkin.FACTORY_STOCK,
     modifier: Modifier = Modifier
 ) {
     val renderer = remember { WeaponPreviewRenderer() }
@@ -111,6 +123,9 @@ fun WeaponPreviewGLView(
 
     LaunchedEffect(weaponId) {
         renderer.activeWeapon = weaponId
+    }
+    LaunchedEffect(skin) {
+        renderer.activeSkin = skin
     }
     LaunchedEffect(dragYaw, dragPitch) {
         renderer.userYawOffset = dragYaw

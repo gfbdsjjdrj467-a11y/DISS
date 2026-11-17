@@ -10,8 +10,11 @@ import com.example.game.maps.MapCatalog
 import com.example.game.maps.NavGrid
 import com.example.game.model.MapId
 import com.example.game.model.PickupType
+import com.example.game.model.RankSystem
+import com.example.game.model.RankTier
 import com.example.game.model.WeaponCatalog
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -88,5 +91,43 @@ class ExampleUnitTest {
         assertValidMesh("BravoHead", TacticalMeshes.buildBotHead(false))
         assertValidMesh("AlphaArm", TacticalMeshes.buildBotArm(true))
         assertValidMesh("BotLeg", TacticalMeshes.buildBotLeg())
+    }
+
+    @Test
+    fun rankSystemCoversBronzeToLegendAndBoundsRpDeltas() {
+        assertEquals(RankTier.BRONZE, RankSystem.tierForRp(0))
+        assertEquals(RankTier.SILVER, RankSystem.tierForRp(500))
+        assertEquals(RankTier.GOLD, RankSystem.tierForRp(1000))
+        assertEquals(RankTier.PLATINUM, RankSystem.tierForRp(1600))
+        assertEquals(RankTier.DIAMOND, RankSystem.tierForRp(2300))
+        assertEquals(RankTier.MASTER, RankSystem.tierForRp(3100))
+        assertEquals(RankTier.LEGEND, RankSystem.tierForRp(4000))
+
+        val legendProgress = RankSystem.progressForRp(4250)
+        assertEquals(RankTier.LEGEND, legendProgress.tier)
+        assertEquals("", legendProgress.division)
+        assertEquals(1f, legendProgress.progressInTier, 0.001f)
+
+        val winDelta = RankSystem.calculateMatchDelta(
+            victory = true, kills = 8, deaths = 2, headshots = 3,
+            scoreAlpha = 5, scoreBravo = 2, currentRp = 990
+        )
+        assertTrue("Victory should award positive RP", winDelta in 22..55)
+
+        val zeroFloorLoss = RankSystem.calculateMatchDelta(
+            victory = false, kills = 0, deaths = 5, headshots = 0,
+            scoreAlpha = 0, scoreBravo = 5, currentRp = 4
+        )
+        assertEquals(-4, zeroFloorLoss)
+    }
+
+    @Test
+    fun weaponSkinsUnlockByKillsOrRank() {
+        assertTrue(WeaponSkin.FACTORY_STOCK.isUnlocked(0, RankTier.BRONZE))
+        assertTrue(WeaponSkin.DESERT_SNAKE.isUnlocked(0, RankTier.BRONZE))
+        assertFalse(WeaponSkin.LEGEND_VOID.isUnlocked(10, RankTier.GOLD))
+        assertTrue(WeaponSkin.LEGEND_VOID.isUnlocked(60, RankTier.BRONZE))
+        assertTrue(WeaponSkin.LEGEND_VOID.isUnlocked(0, RankTier.LEGEND))
+        assertEquals(8, WeaponSkin.entries.size)
     }
 }

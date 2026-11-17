@@ -43,6 +43,11 @@ enum class GameModeType(
     val shortCode: String,
     val description: String
 ) {
+    RANKED_2V2(
+        displayName = "2x2 На звание",
+        shortCode = "2x2",
+        description = "Ранговые бои 2 на 2 до 5 побед в раундах с напарником. Повышайте звание от Бронзы до Легенды!"
+    ),
     TEAM_DEATHMATCH(
         displayName = "Team Deathmatch",
         shortCode = "TDM",

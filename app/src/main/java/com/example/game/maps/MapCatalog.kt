@@ -75,10 +75,21 @@ object MapCatalog {
         boxes += box(-18.5f, 0f, 21f, -17f, 4.8f, 22.5f, 0.48f, 0.42f, 0.34f, 4)
         boxes += box(-24.4f, 4.4f, 15.6f, -16.6f, 4.9f, 22.9f, 0.52f, 0.44f, 0.34f, 4, minimap = false)
 
+        // Helipad zone markings on central tarmac (non-colliding)
+        boxes += box(-2.8f, 0.004f, -9.8f, 2.8f, 0.014f, -9.4f, 0.88f, 0.72f, 0.22f, 0, collides = false, minimap = false)
+        boxes += box(-2.8f, 0.004f, -4.4f, 2.8f, 0.014f, -4.0f, 0.88f, 0.72f, 0.22f, 0, collides = false, minimap = false)
+        boxes += box(-2.8f, 0.004f, -9.8f, -2.4f, 0.014f, -4.0f, 0.88f, 0.72f, 0.22f, 0, collides = false, minimap = false)
+        boxes += box(2.4f, 0.004f, -9.8f, 2.8f, 0.014f, -4.0f, 0.88f, 0.72f, 0.22f, 0, collides = false, minimap = false)
+
         val cylinders = listOf(
             MapCylinder(-22f, 0f, -18f, 1.8f, 3.6f, 0.68f, 0.60f, 0.48f, 2),
             MapCylinder(-22f, 0f, -12f, 1.8f, 3.6f, 0.68f, 0.60f, 0.48f, 2),
             MapCylinder(22f, 0f, 5f, 1.4f, 2.8f, 0.72f, 0.34f, 0.20f, 2)
+        )
+        val cones = listOf(
+            // Watchtower tactical radar spire
+            MapCone(-20.5f, 4.9f, 19.2f, 0.9f, 1.8f, 0.35f, 0.42f, 0.48f, 2),
+            MapCone(-20.5f, 6.6f, 19.2f, 0.18f, 0.35f, 1.0f, 0.42f, 0.16f, -1)
         )
 
         val doors = listOf(
@@ -109,6 +120,7 @@ object MapCatalog {
             weatherParticleType = 1,
             boxes = boxes,
             cylinders = cylinders,
+            cones = cones,
             doorTemplates = doors,
             pickupSpawns = pickups,
             coverNodes = listOf(
@@ -365,6 +377,9 @@ object MapCatalog {
         for ((cx, cz, size) in cabins) {
             val h = size * 0.5f
             boxes += box(cx - h, 0f, cz - h, cx + h, 3.2f, cz + h, 0.42f, 0.28f, 0.18f, 4)
+            // Warm glowing cabin windows (emissive mat -1)
+            boxes += box(cx - 1.1f, 1.4f, cz + h - 0.02f, cx + 1.1f, 2.3f, cz + h + 0.05f, 1.0f, 0.78f, 0.34f, -1, collides = false, minimap = false)
+            boxes += box(cx - 1.1f, 1.4f, cz - h - 0.05f, cx + 1.1f, 2.3f, cz - h + 0.02f, 1.0f, 0.78f, 0.34f, -1, collides = false, minimap = false)
             // Snowy stepped roof
             boxes += box(cx - h - 0.5f, 3.2f, cz - h - 0.5f, cx + h + 0.5f, 4.0f, cz + h + 0.5f, 0.88f, 0.92f, 0.97f, 6, minimap = false)
             boxes += box(cx - h * 0.6f, 4.0f, cz - h * 0.6f, cx + h * 0.6f, 4.8f, cz + h * 0.6f, 0.92f, 0.95f, 0.99f, 6, minimap = false)
@@ -383,15 +398,24 @@ object MapCatalog {
         boxes += box(0f, 0f, -22f, 4f, 1.5f, -20f, 0.45f, 0.30f, 0.18f, 4)
         boxes += box(-4f, 0f, 20f, 0f, 1.5f, 22f, 0.45f, 0.30f, 0.18f, 4)
 
-        // Pine tree trunks + snow-dusted foliage cylinders
-        val cylinders = listOf(
-            MapCylinder(-24f, 0f, 0f, 0.55f, 2.2f, 0.36f, 0.22f, 0.14f, 4),
-            MapCylinder(-24f, 2.2f, 0f, 2.1f, 3.6f, 0.18f, 0.42f, 0.26f, 6),
-            MapCylinder(24f, 0f, 0f, 0.55f, 2.2f, 0.36f, 0.22f, 0.14f, 4),
-            MapCylinder(24f, 2.2f, 0f, 2.1f, 3.6f, 0.18f, 0.42f, 0.26f, 6),
-            MapCylinder(0f, 0f, -15f, 0.5f, 2.0f, 0.36f, 0.22f, 0.14f, 4),
-            MapCylinder(0f, 2.0f, -15f, 1.8f, 3.2f, 0.18f, 0.42f, 0.26f, 6)
+        // Pine tree trunks + multi-tiered snow-dusted pine cones
+        val pinePositions = listOf(
+            -24f to 0f,
+            24f to 0f,
+            0f to -15f,
+            -25f to -20f,
+            25f to 20f
         )
+        val cylinders = pinePositions.map { (px, pz) ->
+            MapCylinder(px, 0f, pz, 0.48f, 2.1f, 0.34f, 0.21f, 0.13f, 4)
+        }
+        val cones = buildList {
+            for ((px, pz) in pinePositions) {
+                add(MapCone(px, 1.9f, pz, 2.2f, 2.4f, 0.16f, 0.36f, 0.22f, 6))
+                add(MapCone(px, 3.4f, pz, 1.65f, 2.1f, 0.24f, 0.48f, 0.34f, 6))
+                add(MapCone(px, 4.7f, pz, 1.05f, 1.8f, 0.82f, 0.90f, 0.96f, 6))
+            }
+        }
 
         val pickups = listOf(
             PickupItemState(1, PickupType.HEALTH, Vec3(0f, 0.45f, 0f)),
@@ -417,6 +441,7 @@ object MapCatalog {
             weatherParticleType = 2,
             boxes = boxes,
             cylinders = cylinders,
+            cones = cones,
             doorTemplates = emptyList(),
             pickupSpawns = pickups,
             coverNodes = listOf(
@@ -483,12 +508,22 @@ object MapCatalog {
         boxes += box(-9f, 0f, 20f, -2f, 1.6f, 22f, 0.56f, 0.42f, 0.22f, 4)
         boxes += box(2f, 0f, -22f, 9f, 1.6f, -20f, 0.56f, 0.42f, 0.22f, 4)
 
+        // Glowing hazard beacons atop silos & catwalk pillars
+        boxes += box(-2.2f, 7.5f, -21.2f, -1.8f, 7.85f, -20.8f, 1.0f, 0.45f, 0.12f, -1, collides = false, minimap = false)
+        boxes += box(3.8f, 7.5f, 20.8f, 4.2f, 7.85f, 21.2f, 1.0f, 0.45f, 0.12f, -1, collides = false, minimap = false)
+        boxes += box(9.8f, 5.2f, -7.2f, 10.2f, 5.55f, -6.8f, 1.0f, 0.58f, 0.15f, -1, collides = false, minimap = false)
+        boxes += box(-10.2f, 5.2f, 6.8f, -9.8f, 5.55f, 7.2f, 1.0f, 0.58f, 0.15f, -1, collides = false, minimap = false)
+
         // Industrial Silos
         val cylinders = listOf(
             MapCylinder(-2f, 0f, -21f, 2.4f, 7.5f, 0.52f, 0.55f, 0.58f, 2),
             MapCylinder(4f, 0f, 21f, 2.4f, 7.5f, 0.52f, 0.55f, 0.58f, 2),
             MapCylinder(10f, 0f, -7f, 1.6f, 5.2f, 0.66f, 0.36f, 0.16f, 2),
             MapCylinder(-10f, 0f, 7f, 1.6f, 5.2f, 0.66f, 0.36f, 0.16f, 2)
+        )
+        val cones = listOf(
+            MapCone(-2f, 7.5f, -21f, 2.45f, 1.4f, 0.42f, 0.45f, 0.49f, 2),
+            MapCone(4f, 7.5f, 21f, 2.45f, 1.4f, 0.42f, 0.45f, 0.49f, 2)
         )
 
         val doors = listOf(
@@ -519,6 +554,7 @@ object MapCatalog {
             weatherParticleType = 3,
             boxes = boxes,
             cylinders = cylinders,
+            cones = cones,
             doorTemplates = doors,
             pickupSpawns = pickups,
             coverNodes = listOf(

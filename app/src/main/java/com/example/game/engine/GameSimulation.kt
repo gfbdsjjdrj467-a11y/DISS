@@ -11,6 +11,7 @@ import com.example.game.maps.MapDefinition
 import com.example.game.maps.NavGrid
 import com.example.game.maps.PickupItemState
 import com.example.game.model.BotAiState
+import com.example.game.model.BotDifficulty
 import com.example.game.model.GameModeType
 import com.example.game.model.GameSettings
 import com.example.game.model.HudState
@@ -19,9 +20,11 @@ import com.example.game.model.MatchResultSummary
 import com.example.game.model.MinimapBlip
 import com.example.game.model.MinimapWall
 import com.example.game.model.PickupType
+import com.example.game.model.RankSystem
 import com.example.game.model.Team
 import com.example.game.model.WeaponCatalog
 import com.example.game.model.WeaponId
+import com.example.game.model.WeaponSkin
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -36,6 +39,7 @@ class GameSimulation(
     private val rng = Random(System.currentTimeMillis())
 
     @Volatile var settings: GameSettings = GameSettings()
+    @Volatile var currentPlayerRp: Int = 0
     @Volatile var isShowcaseMode: Boolean = true
     @Volatile var isPaused: Boolean = false
 
@@ -213,6 +217,7 @@ class GameSimulation(
             shotsHit = 0
             matchElapsed = 0f
             matchTimeRemaining = when (newSettings.selectedMode) {
+                GameModeType.RANKED_2V2 -> 75f
                 GameModeType.TEAM_DEATHMATCH -> 180f
                 GameModeType.FREE_FOR_ALL -> 180f
                 GameModeType.ELIMINATION -> 120f
@@ -269,7 +274,7 @@ class GameSimulation(
 
     private fun spawnPlayer() {
         val spawns = when (settings.selectedMode) {
-            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION -> currentMap.alphaSpawns
+            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION, GameModeType.RANKED_2V2 -> currentMap.alphaSpawns
             else -> currentMap.ffaSpawns
         }
         val sp = spawns[rng.nextInt(spawns.size)]
@@ -293,6 +298,36 @@ class GameSimulation(
         val enemyWeapons = listOf(WeaponId.AR_M4A1, WeaponId.SMG_MPX, WeaponId.SHOTGUN_M870, WeaponId.PISTOL_P9)
 
         when (settings.selectedMode) {
+            GameModeType.RANKED_2V2 -> {
+                // Wingman 2v2: 1 Alpha partner + 2 Bravo rivals scaled to current rank
+                val allySp = currentMap.alphaSpawns[1 % currentMap.alphaSpawns.size]
+                bots.add(
+                    BotEntity(
+                        id = 0,
+                        callsign = "Wingman-01",
+                        team = Team.ALPHA,
+                        weaponId = WeaponId.AR_M4A1,
+                        position = allySp.pos,
+                        yawDeg = allySp.yawDeg
+                    )
+                )
+                val rivalWeapons = listOf(WeaponId.AR_M4A1, WeaponId.SMG_MPX, WeaponId.SNIPER_AWP, WeaponId.SHOTGUN_M870)
+                val tierIdx = RankSystem.tierForRp(currentPlayerRp).ordinal
+                for (j in 0 until 2) {
+                    val sp = currentMap.bravoSpawns[j % currentMap.bravoSpawns.size]
+                    bots.add(
+                        BotEntity(
+                            id = 1 + j,
+                            callsign = "Rival-${j + 1}",
+                            team = Team.BRAVO,
+                            weaponId = rivalWeapons[(j + tierIdx) % rivalWeapons.size],
+                            position = sp.pos,
+                            yawDeg = sp.yawDeg
+                        )
+                    )
+                }
+            }
+
             GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION -> {
                 val alphaCount = (count / 2 - 1).coerceAtLeast(1)
                 val bravoCount = (count - alphaCount).coerceAtLeast(1)
@@ -421,9 +456,15 @@ class GameSimulation(
 
             matchElapsed += dt
             if (settings.selectedMode != GameModeType.SURVIVAL && settings.selectedMode != GameModeType.PRACTICE) {
-                matchTimeRemaining = (matchTimeRemaining - dt).coerceAtLeast(0f)
+                if (roundTransitionTimer <= 0f) {
+                    matchTimeRemaining = (matchTimeRemaining - dt).coerceAtLeast(0f)
+                }
                 if (matchTimeRemaining <= 0f) {
-                    finishMatchByTimeout()
+                    if (settings.selectedMode == GameModeType.RANKED_2V2) {
+                        resolveTimedOutRankedRound()
+                    } else {
+                        finishMatchByTimeout()
+                    }
                     return
                 }
             }
@@ -435,7 +476,10 @@ class GameSimulation(
             botBrain.updateTeamTimers(dt)
 
             if (isDead) {
-                if (settings.selectedMode != GameModeType.ELIMINATION && settings.selectedMode != GameModeType.SURVIVAL) {
+                if (settings.selectedMode != GameModeType.ELIMINATION &&
+                    settings.selectedMode != GameModeType.RANKED_2V2 &&
+                    settings.selectedMode != GameModeType.SURVIVAL
+                ) {
                     respawnTimer -= dt
                     if (respawnTimer <= 0f) {
                         spawnPlayer()
@@ -728,8 +772,11 @@ class GameSimulation(
 
         val eye = playerEyePos()
         val fwd = Math3D.forwardFromYawPitch(playerYaw, playerPitch)
+        val yr = playerYaw * Math3D.DEG_TO_RAD
+        val camRight = Vec3(cos(yr), 0f, sin(yr))
         muzzleFlashPos = eye + fwd * 0.7f
         muzzleFlashIntensity = 1.6f
+        particlePool.spawnShellCasing(eye + fwd * 0.35f + camRight * 0.16f + Vec3(0f, -0.14f, 0f), camRight, Vec3(0f, 1f, 0f))
 
         botBrain.notifySoundEvent(playerPos, 28f, Team.ALPHA, bots)
 
@@ -825,7 +872,7 @@ class GameSimulation(
             botBrain.updateBot(
                 bot = b,
                 dt = dt,
-                difficulty = settings.botDifficulty,
+                difficulty = activeBotDifficulty(),
                 mode = settings.selectedMode,
                 playerPos = playerPos,
                 playerAlive = !isDead,
@@ -843,8 +890,12 @@ class GameSimulation(
             var hitPlayer = false
             var hitBot: BotEntity? = null
 
+            val isTeamMode = settings.selectedMode == GameModeType.TEAM_DEATHMATCH ||
+                settings.selectedMode == GameModeType.ELIMINATION ||
+                settings.selectedMode == GameModeType.RANKED_2V2
+
             // Check player hit
-            if (!isDead && (settings.selectedMode != GameModeType.TEAM_DEATHMATCH && settings.selectedMode != GameModeType.ELIMINATION || shot.shooter.team != Team.ALPHA)) {
+            if (!isDead && (!isTeamMode || shot.shooter.team != Team.ALPHA)) {
                 val playerBox = AABB(
                     playerPos.x - 0.38f, playerPos.y, playerPos.z - 0.38f,
                     playerPos.x + 0.38f, playerPos.y + currentEyeHeight + 0.16f, playerPos.z + 0.38f
@@ -859,7 +910,7 @@ class GameSimulation(
             // Check other bots hit
             for (other in bots) {
                 if (other.id == shot.shooter.id || !other.isAlive) continue
-                if ((settings.selectedMode == GameModeType.TEAM_DEATHMATCH || settings.selectedMode == GameModeType.ELIMINATION) && other.team == shot.shooter.team) continue
+                if (isTeamMode && other.team == shot.shooter.team) continue
                 val bHit = other.bodyAABB().rayIntersect(shot.origin.x, shot.origin.y, shot.origin.z, shot.dir.x, shot.dir.y, shot.dir.z, hitDist)
                 if (bHit != null && bHit < hitDist) {
                     hitDist = bHit
@@ -970,12 +1021,19 @@ class GameSimulation(
                 }
             }
 
-            GameModeType.ELIMINATION -> {
+            GameModeType.ELIMINATION, GameModeType.RANKED_2V2 -> {
+                val targetRoundWins = if (settings.selectedMode == GameModeType.RANKED_2V2) 5 else 3
+                val roundDuration = if (settings.selectedMode == GameModeType.RANKED_2V2) 75f else 120f
                 if (roundTransitionTimer > 0f) {
                     roundTransitionTimer -= dt
                     if (roundTransitionTimer <= 0f) {
                         roundNumber++
+                        matchTimeRemaining = roundDuration
                         spawnPlayer()
+                        val pSpec = WeaponCatalog.byId(slotWeaponIds[0])
+                        val sSpec = WeaponCatalog.byId(slotWeaponIds[1])
+                        slotMagAmmo[0] = pSpec.magSize
+                        slotMagAmmo[1] = sSpec.magSize
                         for (b in bots) {
                             val spList = if (b.team == Team.ALPHA) currentMap.alphaSpawns else currentMap.bravoSpawns
                             b.resetForSpawn(spList[rng.nextInt(spList.size)].pos, 0f)
@@ -987,16 +1045,20 @@ class GameSimulation(
                 val bravoAlive = bots.count { it.team == Team.BRAVO && it.isAlive }
                 if (bravoAlive == 0) {
                     scoreAlpha++
-                    if (scoreAlpha >= 3) {
-                        endMatch(true, "ПОБЕДА ОТРЯДА", "Выиграно раундов: $scoreAlpha : $scoreBravo")
+                    if (scoreAlpha >= targetRoundWins) {
+                        endMatch(true, "ПОБЕДА 2x2!", "Выиграно раундов: $scoreAlpha : $scoreBravo")
                     } else {
+                        pickupMsg = "РАУНД $roundNumber ЗА ALPHA ($scoreAlpha:$scoreBravo)"
+                        pickupMsgTimer = 2.2f
                         roundTransitionTimer = 2.4f
                     }
                 } else if (alphaAlive == 0) {
                     scoreBravo++
-                    if (scoreBravo >= 3) {
+                    if (scoreBravo >= targetRoundWins) {
                         endMatch(false, "ПОРАЖЕНИЕ", "Счёт раундов: $scoreAlpha : $scoreBravo")
                     } else {
+                        pickupMsg = "РАУНД $roundNumber ЗА BRAVO ($scoreAlpha:$scoreBravo)"
+                        pickupMsgTimer = 2.2f
                         roundTransitionTimer = 2.4f
                     }
                 }
@@ -1032,6 +1094,27 @@ class GameSimulation(
         }
     }
 
+    private fun resolveTimedOutRankedRound() {
+        val alphaAlive = (if (!isDead) 1 else 0) + bots.count { it.team == Team.ALPHA && it.isAlive }
+        val bravoAlive = bots.count { it.team == Team.BRAVO && it.isAlive }
+        if (alphaAlive >= bravoAlive) {
+            scoreAlpha++
+            pickupMsg = "ВРЕМЯ РАУНДА • ALPHA ($scoreAlpha:$scoreBravo)"
+        } else {
+            scoreBravo++
+            pickupMsg = "ВРЕМЯ РАУНДА • BRAVO ($scoreAlpha:$scoreBravo)"
+        }
+        pickupMsgTimer = 2.2f
+        if (scoreAlpha >= 5) {
+            endMatch(true, "ПОБЕДА 2x2!", "Выиграно раундов: $scoreAlpha : $scoreBravo")
+        } else if (scoreBravo >= 5) {
+            endMatch(false, "ПОРАЖЕНИЕ", "Счёт раундов: $scoreAlpha : $scoreBravo")
+        } else {
+            matchTimeRemaining = 75f
+            roundTransitionTimer = 2.0f
+        }
+    }
+
     private fun finishMatchByTimeout() {
         when (settings.selectedMode) {
             GameModeType.TEAM_DEATHMATCH -> {
@@ -1041,9 +1124,9 @@ class GameSimulation(
             GameModeType.FREE_FOR_ALL -> {
                 val topBot = bots.maxOfOrNull { it.kills } ?: 0
                 val won = playerKills >= topBot
-                endMatch(won, if (won) "ПОБЕДА" else "МАТЧ ЗАВЕРШЁН", "Время вышло")
+                endMatch(won, if (won) "ПЕРВОЕ МЕСТО" else "МАТЧ ЗАВЕРШЁН", "Время вышло")
             }
-            GameModeType.ELIMINATION -> {
+            GameModeType.ELIMINATION, GameModeType.RANKED_2V2 -> {
                 val won = scoreAlpha >= scoreBravo
                 endMatch(won, if (won) "ПОБЕДА" else "ПОРАЖЕНИЕ", "Итог по раундам: $scoreAlpha : $scoreBravo")
             }
@@ -1056,6 +1139,19 @@ class GameSimulation(
         matchEnded = true
         if (victory) soundEngine.playVictory() else soundEngine.playDefeat()
         val waves = if (settings.selectedMode == GameModeType.SURVIVAL) (waveNumber - 1).coerceAtLeast(0) else 0
+        val rpBefore = currentPlayerRp
+        val rankDelta = if (settings.selectedMode == GameModeType.RANKED_2V2) {
+            RankSystem.calculateMatchDelta(
+                victory = victory,
+                kills = playerKills,
+                deaths = playerDeaths,
+                headshots = playerHeadshots,
+                scoreAlpha = scoreAlpha,
+                scoreBravo = scoreBravo,
+                currentRp = rpBefore
+            )
+        } else 0
+        val rpAfter = (rpBefore + rankDelta).coerceAtLeast(0)
         val summary = MatchResultSummary(
             victory = victory,
             title = title,
@@ -1070,7 +1166,10 @@ class GameSimulation(
             shotsFired = shotsFired,
             shotsHit = shotsHit,
             wavesCleared = waves,
-            durationSec = matchElapsed.toInt().coerceAtLeast(1)
+            durationSec = matchElapsed.toInt().coerceAtLeast(1),
+            rpBefore = rpBefore,
+            rpAfter = rpAfter,
+            rankDelta = rankDelta
         )
         matchResult = summary
         onMatchFinished(summary)
@@ -1099,15 +1198,24 @@ class GameSimulation(
         )
     }
 
+    private fun activeBotDifficulty(): BotDifficulty {
+        return if (settings.selectedMode == GameModeType.RANKED_2V2) {
+            RankSystem.tierForRp(currentPlayerRp).matchedBotDifficulty
+        } else {
+            settings.botDifficulty
+        }
+    }
+
     private fun isEnemyOfPlayer(bot: BotEntity): Boolean {
         return when (settings.selectedMode) {
-            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION -> bot.team != Team.ALPHA
+            GameModeType.TEAM_DEATHMATCH, GameModeType.ELIMINATION, GameModeType.RANKED_2V2 -> bot.team != Team.ALPHA
             GameModeType.FREE_FOR_ALL, GameModeType.SURVIVAL, GameModeType.PRACTICE -> true
         }
     }
 
     fun playerEyePos(): Vec3 = Vec3(playerPos.x, playerPos.y + currentEyeHeight, playerPos.z)
     fun activeWeaponId(): WeaponId = slotWeaponIds[activeSlot]
+    fun activeWeaponSkin(): WeaponSkin = settings.skinFor(slotWeaponIds[activeSlot])
     fun getWeaponBobPhase(): Float = weaponBobPhase
     fun isPlayerDeadForRender(): Boolean = isDead
     fun isAdsActiveForRender(): Boolean = isAdsInput || (settings.autoAdsOnFire && isFiringInput)
@@ -1178,6 +1286,7 @@ class GameSimulation(
                 isDead = isDead,
                 respawnSecondsLeft = respawnTimer.coerceAtLeast(0f),
                 activeWeaponId = slotWeaponIds[activeSlot],
+                activeWeaponSkin = settings.skinFor(slotWeaponIds[activeSlot]),
                 secondaryWeaponId = slotWeaponIds[1 - activeSlot],
                 ammoInMag = slotMagAmmo[activeSlot],
                 ammoReserve = slotReserveAmmo[activeSlot],
@@ -1203,7 +1312,7 @@ class GameSimulation(
                 playerKills = playerKills,
                 playerDeaths = playerDeaths,
                 roundNumber = roundNumber,
-                totalRounds = 5,
+                totalRounds = if (settings.selectedMode == GameModeType.RANKED_2V2) 5 else 3,
                 waveNumber = waveNumber,
                 aliveAlpha = alphaAlive,
                 aliveBravo = bravoAlive,

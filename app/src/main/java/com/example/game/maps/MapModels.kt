@@ -39,6 +39,19 @@ data class MapCylinder(
     )
 }
 
+data class MapCone(
+    val cx: Float,
+    val baseY: Float,
+    val cz: Float,
+    val radius: Float,
+    val height: Float,
+    val r: Float,
+    val g: Float,
+    val b: Float,
+    val matType: Int = 6,
+    val segments: Int = 12
+)
+
 class DoorState(
     val id: String,
     val closedBox: AABB,
@@ -92,6 +105,7 @@ data class MapDefinition(
     val weatherParticleType: Int, // 0 = none, 1 = desert dust, 2 = snow flakes, 3 = industrial embers
     val boxes: List<MapBox>,
     val cylinders: List<MapCylinder>,
+    val cones: List<MapCone> = emptyList(),
     val doorTemplates: List<DoorState>,
     val pickupSpawns: List<PickupItemState>,
     val coverNodes: List<Vec3>,

@@ -39,7 +39,10 @@ data class MatchResultSummary(
     val shotsFired: Int,
     val shotsHit: Int,
     val wavesCleared: Int,
-    val durationSec: Int
+    val durationSec: Int,
+    val rpBefore: Int = 0,
+    val rpAfter: Int = 0,
+    val rankDelta: Int = 0
 ) {
     val accuracyPercent: Float
         get() = if (shotsFired > 0) (shotsHit.toFloat() / shotsFired.toFloat()) * 100f else 0f
@@ -54,6 +57,7 @@ data class HudState(
     val isDead: Boolean = false,
     val respawnSecondsLeft: Float = 0f,
     val activeWeaponId: WeaponId = WeaponId.AR_M4A1,
+    val activeWeaponSkin: WeaponSkin = WeaponSkin.FACTORY_STOCK,
     val secondaryWeaponId: WeaponId = WeaponId.PISTOL_P9,
     val ammoInMag: Int = 30,
     val ammoReserve: Int = 150,

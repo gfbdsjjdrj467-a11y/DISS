@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.CareerStatsEntity
 import com.example.data.MatchRecordEntity
+import com.example.ui.components.RankProgressCard
 import com.example.ui.theme.AlertCrimson
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.GunmetalCard
@@ -128,24 +129,25 @@ fun StatsScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Left Career Summary Grid
+            // Left Career Summary Grid + Ranked Progress
             Column(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                RankProgressCard(rp = career.rankPoints)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CareerTile("МАТЧИ", "${career.matchesPlayed}", TextPrimary, Modifier.weight(1f))
                     CareerTile("ПОБЕДЫ", "${career.wins}", EmeraldSuccess, Modifier.weight(1f))
-                    CareerTile("ПОРАЖЕНИЯ", "${career.losses}", AlertCrimson, Modifier.weight(1f))
+                    CareerTile("2x2 ПОБЕДЫ", "${career.rankedWins}/${career.rankedMatches}", StrikeAmber, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CareerTile("УСТРАНЕНИЯ", "${career.totalKills}", StrikeAmber, Modifier.weight(1f))
-                    CareerTile("СМЕРТИ", "${career.totalDeaths}", TextSecondary, Modifier.weight(1f))
                     CareerTile("K/D", String.format("%.2f", career.kdRatio), TacticalCyan, Modifier.weight(1f))
+                    CareerTile("ТОЧНОСТЬ", String.format("%.1f%%", career.accuracyPercent), TacticalCyan, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CareerTile("ТОЧНОСТЬ", String.format("%.1f%%", career.accuracyPercent), TacticalCyan, Modifier.weight(1f))
-                    CareerTile("ЛУЧШИЙ СЧЁТ", "${career.bestScore}", StrikeAmber, Modifier.weight(1f))
+                    CareerTile("ПИК RP", "${career.peakRankPoints}", StrikeAmber, Modifier.weight(1f))
+                    CareerTile("ЛУЧШИЙ СЧЁТ", "${career.bestScore}", TextPrimary, Modifier.weight(1f))
                     CareerTile("МАКС. ВОЛНА", "${career.highestSurvivalWave}", EmeraldSuccess, Modifier.weight(1f))
                 }
             }
@@ -197,7 +199,16 @@ fun StatsScreen(
                                                 style = MaterialTheme.typography.labelLarge,
                                                 color = if (item.victory) EmeraldSuccess else AlertCrimson
                                             )
-                                            Text("${item.score} ОЧК.", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                                            if (item.rankDelta != 0) {
+                                                val sign = if (item.rankDelta > 0) "+" else ""
+                                                Text(
+                                                    "$sign${item.rankDelta} RP",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (item.rankDelta > 0) EmeraldSuccess else AlertCrimson
+                                                )
+                                            } else {
+                                                Text("${item.score} ОЧК.", style = MaterialTheme.typography.labelSmall, color = StrikeAmber)
+                                            }
                                         }
                                     }
                                 }

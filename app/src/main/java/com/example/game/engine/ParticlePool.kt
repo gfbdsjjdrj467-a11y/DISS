@@ -65,6 +65,22 @@ class ParticlePool(private val maxParticles: Int = 220) {
         }
     }
 
+    fun spawnShellCasing(pos: Vec3, right: Vec3, up: Vec3) {
+        val p = acquire() ?: return
+        p.active = true
+        p.isTracer = false
+        p.x = pos.x; p.y = pos.y; p.z = pos.z
+        val sideSpeed = 2.1f + rng.nextFloat() * 0.9f
+        val upSpeed = 1.6f + rng.nextFloat() * 0.7f
+        p.vx = right.x * sideSpeed + up.x * upSpeed
+        p.vy = right.y * sideSpeed + up.y * upSpeed
+        p.vz = right.z * sideSpeed + up.z * upSpeed
+        p.life = 0.42f
+        p.maxLife = 0.42f
+        p.size = 0.045f
+        p.r = 0.96f; p.g = 0.78f; p.b = 0.26f
+    }
+
     fun spawnAmbientWeather(center: Vec3, weatherType: Int) {
         if (weatherType == 0) return
         val p = acquire() ?: return

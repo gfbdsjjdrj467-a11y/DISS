@@ -424,11 +424,14 @@ object TacticalMeshes {
         for (c in map.cylinders) {
             mb.addCylinder(c.cx, c.baseY, c.cz, c.radius, c.height, c.r, c.g, c.b, c.matType, c.segments)
         }
+        for (cn in map.cones) {
+            mb.addCone(cn.cx, cn.baseY, cn.cz, cn.radius, cn.height, cn.r, cn.g, cn.b, cn.matType, cn.segments)
+        }
         return mb.build()
     }
 
     /**
-     * Smooth gradient sky hemisphere + glowing sun disc (emissive matType = -1).
+     * Smooth gradient sky hemisphere (-1) + glowing sun disc (-2).
      */
     fun buildSkyDome(map: MapDefinition): GpuMesh {
         val mb = MeshBuilder()
@@ -459,19 +462,18 @@ object TacticalMeshes {
                 val x10 = cos(th0) * rad1; val z10 = sin(th0) * rad1
                 val x11 = cos(th1) * rad1; val z11 = sin(th1) * rad1
 
-                // Inside-facing triangles (visible from center)
                 mb.addTriUv(x00, y0, z00, 0f, 0f, x10, y1, z10, 0f, 1f, x01, y0, z01, 1f, 0f, 0f, 1f, 0f, r0, g0, b0, -1f)
                 mb.addTriUv(x01, y0, z01, 1f, 0f, x10, y1, z10, 0f, 1f, x11, y1, z11, 1f, 1f, 0f, 1f, 0f, r1, g1, b1, -1f)
             }
         }
 
-        // Glowing Sun disc positioned along sunDirection
+        // Glowing Sun disc positioned along sunDirection (-2f = bright unshaded disc)
         val sunP = map.sunDirection * 96f
         val (sr, sg, sb) = map.sunColor
         mb.addTube(
             sunP.x, sunP.y, sunP.z,
             sunP.x - map.sunDirection.x * 1.2f, sunP.y - map.sunDirection.y * 1.2f, sunP.z - map.sunDirection.z * 1.2f,
-            6.5f, 6.5f, sr, sg, sb * 0.9f, -1, 16, true
+            6.5f, 6.5f, sr, sg, sb * 0.9f, -2, 16, true
         )
         return mb.build()
     }
@@ -486,16 +488,18 @@ object TacticalMeshes {
         val mb = MeshBuilder()
         when (type) {
             PickupType.HEALTH -> {
-                mb.addChamferedBox(0f, 0f, 0f, 0.52f, 0.34f, 0.38f, 0.05f, 0.92f, 0.94f, 0.96f, 2)
-                mb.addCenteredBox(0f, 0.18f, 0f, 0.24f, 0.03f, 0.08f, 0.10f, 0.95f, 0.45f, -1)
-                mb.addCenteredBox(0f, 0.18f, 0f, 0.08f, 0.03f, 0.24f, 0.10f, 0.95f, 0.45f, -1)
+                mb.addChamferedBox(0f, 0f, 0f, 0.54f, 0.34f, 0.38f, 0.05f, 0.92f, 0.94f, 0.96f, 2)
+                mb.addChamferedBox(0f, 0.17f, 0f, 0.28f, 0.04f, 0.18f, 0.01f, 0.18f, 0.22f, 0.26f, 3)
+                mb.addCenteredBox(0f, 0.195f, 0f, 0.24f, 0.03f, 0.08f, 0.10f, 0.95f, 0.45f, -1)
+                mb.addCenteredBox(0f, 0.195f, 0f, 0.08f, 0.03f, 0.24f, 0.10f, 0.95f, 0.45f, -1)
             }
             PickupType.AMMO -> {
                 mb.addChamferedBox(0f, 0f, 0f, 0.54f, 0.30f, 0.36f, 0.04f, 0.24f, 0.34f, 0.22f, 2)
                 mb.addCenteredBox(0f, 0.04f, 0f, 0.56f, 0.06f, 0.38f, 0.96f, 0.72f, 0.16f, 2)
-                mb.addTube(-0.14f, 0.16f, -0.06f, -0.14f, 0.16f, 0.06f, 0.025f, 0.025f, 0.95f, 0.78f, 0.22f, 2, 8)
-                mb.addTube(0.0f, 0.16f, -0.06f, 0.0f, 0.16f, 0.06f, 0.025f, 0.025f, 0.95f, 0.78f, 0.22f, 2, 8)
-                mb.addTube(0.14f, 0.16f, -0.06f, 0.14f, 0.16f, 0.06f, 0.025f, 0.025f, 0.95f, 0.78f, 0.22f, 2, 8)
+                for (i in -1..1) {
+                    mb.addTube(i * 0.12f, 0.16f, -0.07f, i * 0.12f, 0.16f, 0.05f, 0.025f, 0.025f, 0.95f, 0.78f, 0.22f, 2, 10)
+                    mb.addTube(i * 0.12f, 0.16f, -0.07f, i * 0.12f, 0.16f, -0.11f, 0.025f, 0.008f, 0.78f, 0.45f, 0.18f, 2, 10)
+                }
             }
             PickupType.ARMOR -> {
                 mb.addChamferedBox(0f, 0f, 0f, 0.48f, 0.42f, 0.28f, 0.06f, 0.16f, 0.42f, 0.68f, 7)
@@ -510,21 +514,27 @@ object TacticalMeshes {
         val mb = MeshBuilder()
         val (tr, tg, tb) = if (isAlpha) Triple(0.18f, 0.44f, 0.82f) else Triple(0.80f, 0.22f, 0.22f)
         // Undershirt / torso core (Camo)
-        mb.addChamferedBox(0f, 0.28f, 0f, 0.44f, 0.56f, 0.25f, 0.05f, 0.26f, 0.29f, 0.31f, 7)
-        // Plate carrier Kevlar vest
+        mb.addChamferedBox(0f, 0.28f, 0f, 0.44f, 0.56f, 0.25f, 0.05f, 0.24f, 0.27f, 0.30f, 7)
+        // Plate carrier Kevlar vest + Molle straps
         mb.addChamferedBox(0f, 0.31f, 0f, 0.48f, 0.38f, 0.30f, 0.05f, tr, tg, tb, 7)
-        // Chest mag pouches (front -Z)
-        mb.addCenteredBox(-0.11f, 0.22f, -0.16f, 0.09f, 0.14f, 0.06f, 0.18f, 0.20f, 0.22f, 7)
-        mb.addCenteredBox(0.0f, 0.22f, -0.16f, 0.09f, 0.14f, 0.06f, 0.18f, 0.20f, 0.22f, 7)
-        mb.addCenteredBox(0.11f, 0.22f, -0.16f, 0.09f, 0.14f, 0.06f, 0.18f, 0.20f, 0.22f, 7)
+        for (row in 0..2) {
+            mb.addCenteredBox(0f, 0.20f + row * 0.09f, -0.155f, 0.36f, 0.025f, 0.02f, 0.12f, 0.13f, 0.14f, 3)
+        }
+        // Chest mag pouches (front -Z) + Glowing team crest badge
+        for (i in -1..1) {
+            mb.addChamferedBox(i * 0.11f, 0.21f, -0.165f, 0.085f, 0.14f, 0.06f, 0.015f, 0.16f, 0.18f, 0.20f, 7)
+        }
+        mb.addCenteredBox(-0.14f, 0.42f, -0.156f, 0.09f, 0.045f, 0.02f, tr * 1.2f, tg * 1.2f, tb * 1.2f, -1)
         // Tactical radio & backpack on back (+Z)
         mb.addChamferedBox(0f, 0.32f, 0.18f, 0.30f, 0.34f, 0.14f, 0.04f, 0.20f, 0.22f, 0.24f, 7)
-        mb.addTube(0.11f, 0.46f, 0.20f, 0.11f, 0.66f, 0.22f, 0.014f, 0.010f, 0.15f, 0.15f, 0.16f, 3, 6)
+        mb.addTube(0.11f, 0.46f, 0.20f, 0.11f, 0.70f, 0.22f, 0.014f, 0.008f, 0.15f, 0.15f, 0.16f, 3, 8)
         // Shoulder pauldrons
-        mb.addChamferedBox(-0.26f, 0.45f, 0f, 0.14f, 0.14f, 0.22f, 0.03f, tr * 0.85f, tg * 0.85f, tb * 0.85f, 3)
-        mb.addChamferedBox(0.26f, 0.45f, 0f, 0.14f, 0.14f, 0.22f, 0.03f, tr * 0.85f, tg * 0.85f, tb * 0.85f, 3)
-        // Utility belt
+        mb.addChamferedBox(-0.27f, 0.46f, 0f, 0.15f, 0.14f, 0.22f, 0.035f, tr * 0.85f, tg * 0.85f, tb * 0.85f, 3)
+        mb.addChamferedBox(0.27f, 0.46f, 0f, 0.15f, 0.14f, 0.22f, 0.035f, tr * 0.85f, tg * 0.85f, tb * 0.85f, 3)
+        // Utility belt & side pouches
         mb.addCenteredBox(0f, 0.04f, 0f, 0.47f, 0.09f, 0.28f, 0.14f, 0.14f, 0.15f, 3)
+        mb.addChamferedBox(-0.25f, 0.04f, 0f, 0.07f, 0.11f, 0.13f, 0.015f, 0.18f, 0.20f, 0.22f, 7)
+        mb.addChamferedBox(0.25f, 0.04f, 0f, 0.07f, 0.11f, 0.13f, 0.015f, 0.18f, 0.20f, 0.22f, 7)
         return mb.build()
     }
 
@@ -533,22 +543,30 @@ object TacticalMeshes {
         val (vr, vg, vb) = if (isAlpha) Triple(0.12f, 0.88f, 1.0f) else Triple(1.0f, 0.36f, 0.10f)
         // Cylindrical neck
         mb.addTube(0f, -0.05f, 0f, 0f, 0.08f, 0f, 0.08f, 0.075f, 0.20f, 0.22f, 0.24f, 7, 10)
-        // Rounded/chamfered helmet shell
-        mb.addChamferedBox(0f, 0.18f, 0.01f, 0.31f, 0.26f, 0.33f, 0.07f, 0.24f, 0.27f, 0.28f, 3)
-        // Lower face mask / respirator
+        // Rounded/chamfered helmet shell + top rail arc
+        mb.addChamferedBox(0f, 0.18f, 0.01f, 0.32f, 0.26f, 0.34f, 0.07f, 0.24f, 0.27f, 0.28f, 3)
+        // Comms headset ear cups + mic boom
+        mb.addTube(-0.17f, 0.16f, 0.0f, -0.15f, 0.16f, 0.0f, 0.065f, 0.065f, 0.15f, 0.17f, 0.19f, 3, 10)
+        mb.addTube(0.17f, 0.16f, 0.0f, 0.15f, 0.16f, 0.0f, 0.065f, 0.065f, 0.15f, 0.17f, 0.19f, 3, 10)
+        // Lower ballistic face mask
         mb.addChamferedBox(0f, 0.08f, -0.06f, 0.23f, 0.12f, 0.20f, 0.04f, 0.14f, 0.16f, 0.18f, 3)
         // Glowing tactical visor (-Z forward)
-        mb.addCenteredBox(0f, 0.19f, -0.158f, 0.25f, 0.075f, 0.035f, vr, vg, vb, -1)
-        // NVG forehead mount bracket
+        mb.addCenteredBox(0f, 0.18f, -0.162f, 0.25f, 0.070f, 0.035f, vr, vg, vb, -1)
+        // NVG Mount Bracket + Dual-Tube Night Vision Goggles
         mb.addCenteredBox(0f, 0.29f, -0.16f, 0.09f, 0.05f, 0.05f, 0.18f, 0.20f, 0.22f, 3)
+        mb.addTube(-0.05f, 0.29f, -0.18f, -0.05f, 0.29f, -0.26f, 0.028f, 0.026f, 0.14f, 0.15f, 0.17f, 3, 10)
+        mb.addTube(0.05f, 0.29f, -0.18f, 0.05f, 0.29f, -0.26f, 0.028f, 0.026f, 0.14f, 0.15f, 0.17f, 3, 10)
+        mb.addTube(-0.05f, 0.29f, -0.258f, -0.05f, 0.29f, -0.264f, 0.020f, 0.020f, vr, vg, vb, -1, 10)
+        mb.addTube(0.05f, 0.29f, -0.258f, 0.05f, 0.29f, -0.264f, 0.020f, 0.020f, vr, vg, vb, -1, 10)
         return mb.build()
     }
 
     fun buildBotArm(isAlpha: Boolean): GpuMesh {
         val mb = MeshBuilder()
         val (ar, ag, ab) = if (isAlpha) Triple(0.22f, 0.36f, 0.56f) else Triple(0.46f, 0.22f, 0.22f)
-        // Upper sleeve + forearm + tactical glove
+        // Upper sleeve + elbow armor pad + forearm + armored glove
         mb.addTube(0f, 0f, 0f, 0f, -0.25f, 0f, 0.072f, 0.064f, ar, ag, ab, 7, 10)
+        mb.addChamferedBox(0f, -0.24f, 0.04f, 0.12f, 0.09f, 0.07f, 0.02f, 0.14f, 0.15f, 0.16f, 3)
         mb.addTube(0f, -0.25f, 0f, 0f, -0.44f, 0f, 0.062f, 0.054f, 0.24f, 0.26f, 0.28f, 7, 10)
         mb.addChamferedBox(0f, -0.49f, 0f, 0.10f, 0.11f, 0.11f, 0.02f, 0.14f, 0.15f, 0.16f, 3)
         return mb.build()
@@ -556,7 +574,7 @@ object TacticalMeshes {
 
     fun buildBotLeg(): GpuMesh {
         val mb = MeshBuilder()
-        // Thigh, kneepad, shin, combat boot
+        // Thigh, drop holster panel, kneepad, shin, treaded combat boot
         mb.addTube(0f, 0f, 0f, 0f, -0.36f, 0f, 0.095f, 0.082f, 0.20f, 0.22f, 0.25f, 7, 10)
         mb.addChamferedBox(0f, -0.37f, -0.05f, 0.13f, 0.10f, 0.11f, 0.02f, 0.14f, 0.15f, 0.17f, 3)
         mb.addTube(0f, -0.36f, 0f, 0f, -0.64f, 0f, 0.080f, 0.068f, 0.18f, 0.20f, 0.22f, 7, 10)
@@ -565,177 +583,198 @@ object TacticalMeshes {
     }
 
     /**
-     * First-Person Armored Tactical Forearms & Gloves attached relative to weapon space.
+     * First-Person Armored Tactical Forearms, Gloves & Left Wrist Tactical Display.
      */
     fun buildPlayerViewArms(): GpuMesh {
         val mb = MeshBuilder()
-        // Right armored forearm & gloved hand gripping pistol grip
-        mb.addTube(0.11f, -0.22f, 0.34f, 0.02f, -0.09f, 0.11f, 0.052f, 0.044f, 0.20f, 0.24f, 0.28f, 7, 10)
-        mb.addChamferedBox(0.0f, -0.07f, 0.08f, 0.072f, 0.085f, 0.082f, 0.015f, 0.14f, 0.15f, 0.16f, 3)
-        // Left armored forearm & gloved support hand cradling forend
-        mb.addTube(-0.18f, -0.20f, 0.20f, -0.03f, -0.03f, -0.18f, 0.050f, 0.042f, 0.20f, 0.24f, 0.28f, 7, 10)
-        mb.addChamferedBox(-0.01f, -0.02f, -0.20f, 0.072f, 0.065f, 0.095f, 0.015f, 0.14f, 0.15f, 0.16f, 3)
+        // Right armored forearm, wrist strap, and armored glove gripping pistol grip
+        mb.addTube(0.11f, -0.22f, 0.34f, 0.02f, -0.09f, 0.11f, 0.054f, 0.044f, 0.20f, 0.24f, 0.28f, 7, 10)
+        mb.addTube(0.05f, -0.13f, 0.19f, 0.03f, -0.11f, 0.14f, 0.049f, 0.048f, 0.14f, 0.15f, 0.16f, 3, 10)
+        mb.addChamferedBox(0.0f, -0.07f, 0.08f, 0.074f, 0.085f, 0.084f, 0.016f, 0.14f, 0.15f, 0.16f, 3)
+        mb.addCenteredBox(0.0f, -0.048f, 0.046f, 0.064f, 0.020f, 0.018f, 0.22f, 0.24f, 0.26f, 2) // knuckle guard
+
+        // Left armored forearm + wrist tactical computer + gloved support hand cradling forend
+        mb.addTube(-0.18f, -0.20f, 0.20f, -0.03f, -0.03f, -0.18f, 0.052f, 0.042f, 0.20f, 0.24f, 0.28f, 7, 10)
+        // Tactical smartwatch/radar display on left wrist facing player
+        mb.addChamferedBox(-0.075f, -0.055f, -0.06f, 0.052f, 0.024f, 0.062f, 0.005f, 0.12f, 0.13f, 0.15f, 3)
+        mb.addCenteredBox(-0.075f, -0.042f, -0.06f, 0.036f, 0.006f, 0.044f, 0.08f, 0.90f, 0.78f, -1)
+        mb.addChamferedBox(-0.01f, -0.02f, -0.20f, 0.074f, 0.065f, 0.095f, 0.016f, 0.14f, 0.15f, 0.16f, 3)
         return mb.build()
     }
 
     /**
-     * Detailed, non-blocky 3D Weapon Models using tapered cylinders, chamfered receivers,
-     * angled ergonomic grips, curved multi-segment magazines, Picatinny rails, scopes & glowing optics.
+     * Ultra-Detailed, Non-Blocky 3D Weapon Models.
+     * Note: matType 2 & 3 receive custom WeaponSkin shader patterns;
+     * matType 4 (wood), 7 (polymer/grip texture), -1 (emissive optics/tritium) preserve contrast details.
      */
     fun buildWeaponMesh(weaponId: WeaponId): GpuMesh {
         val spec = WeaponCatalog.byId(weaponId)
         val (br, bg, bb) = spec.bodyColor
         val (ar, ag, ab) = spec.accentColor
         val darkSteel = Triple(0.13f, 0.14f, 0.16f)
-        val chromeSteel = Triple(0.45f, 0.48f, 0.52f)
+        val chromeSteel = Triple(0.48f, 0.51f, 0.56f)
         val mb = MeshBuilder()
 
         when (weaponId) {
             WeaponId.PISTOL_P9 -> {
-                // Chamfered upper slide (-Z forward)
-                mb.addChamferedBox(0f, 0.042f, -0.06f, 0.050f, 0.050f, 0.27f, 0.012f, br, bg, bb, 3)
-                // Slide serrations (tactical grip ridges)
+                // Machined chamfered slide + ejection port bevel (-Z forward)
+                mb.addChamferedBox(0f, 0.042f, -0.06f, 0.050f, 0.050f, 0.275f, 0.014f, br, bg, bb, 3)
+                mb.addCenteredBox(0.014f, 0.058f, -0.045f, 0.026f, 0.022f, 0.052f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2) // chamber hood
+                // Front + Rear slide serrations
                 for (i in 0..4) {
-                    mb.addCenteredBox(0f, 0.042f, 0.02f + i * 0.012f, 0.053f, 0.036f, 0.005f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                    mb.addCenteredBox(0f, 0.042f, 0.022f + i * 0.011f, 0.053f, 0.036f, 0.005f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                    if (i < 3) {
+                        mb.addCenteredBox(0f, 0.042f, -0.14f + i * 0.011f, 0.052f, 0.032f, 0.005f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                    }
                 }
-                // Lower polymer frame + dust cover
-                mb.addChamferedBox(0f, 0.008f, -0.05f, 0.044f, 0.028f, 0.23f, 0.008f, 0.14f, 0.15f, 0.17f, 3)
-                // Cylindrical threaded barrel + muzzle compensator
-                mb.addTube(0f, 0.040f, -0.18f, 0f, 0.040f, -0.24f, 0.014f, 0.014f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 12)
-                mb.addTube(0f, 0.040f, -0.235f, 0f, 0.040f, -0.29f, 0.019f, 0.018f, ar, ag, ab, 3, 12)
+                // Polymer frame with Picatinny dust-cover notches
+                mb.addChamferedBox(0f, 0.008f, -0.05f, 0.044f, 0.028f, 0.235f, 0.009f, 0.14f, 0.15f, 0.17f, 7)
+                // Cylindrical chrome barrel + ported compensator
+                mb.addTube(0f, 0.040f, -0.18f, 0f, 0.040f, -0.245f, 0.014f, 0.014f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 14)
+                mb.addTube(0f, 0.040f, -0.235f, 0f, 0.040f, -0.30f, 0.020f, 0.018f, ar, ag, ab, 3, 14)
                 // Under-barrel tactical laser/light module
-                mb.addTube(0f, -0.014f, -0.09f, 0f, -0.014f, -0.18f, 0.015f, 0.015f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 10)
-                mb.addTube(0f, -0.014f, -0.18f, 0f, -0.014f, -0.184f, 0.011f, 0.011f, 0.2f, 0.9f, 1.0f, -1, 10)
-                // Angled ergonomic pistol grip
+                mb.addTube(0f, -0.014f, -0.09f, 0f, -0.014f, -0.185f, 0.015f, 0.015f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
+                mb.addTube(0f, -0.014f, -0.184f, 0f, -0.014f, -0.189f, 0.011f, 0.011f, 0.2f, 0.9f, 1.0f, -1, 12)
+                // Angled stippled pistol grip + magwell flare + extended baseplate
                 mb.addOrientedBar(0f, -0.115f, 0.072f, 0f, -0.002f, 0.036f, 0.042f, 0.064f, 0.12f, 0.13f, 0.15f, 7)
-                // Magazine baseplate
-                mb.addChamferedBox(0f, -0.122f, 0.075f, 0.045f, 0.018f, 0.068f, 0.004f, ar, ag, ab, 3)
-                // Trigger guard & trigger
-                mb.addCenteredBox(0f, -0.036f, -0.028f, 0.016f, 0.008f, 0.062f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
-                mb.addCenteredBox(0f, -0.018f, -0.056f, 0.016f, 0.036f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addChamferedBox(0f, -0.124f, 0.075f, 0.048f, 0.020f, 0.070f, 0.005f, ar, ag, ab, 3)
+                // Trigger guard & curved trigger
+                mb.addCenteredBox(0f, -0.036f, -0.028f, 0.016f, 0.008f, 0.062f, darkSteel.first, darkSteel.second, darkSteel.third, 7)
+                mb.addCenteredBox(0f, -0.018f, -0.056f, 0.016f, 0.036f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 7)
+                mb.addOrientedBar(0f, -0.022f, -0.022f, 0f, -0.002f, -0.032f, 0.008f, 0.010f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2)
                 // Glowing 3-dot tritium iron sights
-                mb.addCenteredBox(0f, 0.074f, -0.18f, 0.012f, 0.015f, 0.014f, 0.15f, 1.0f, 0.55f, -1)
-                mb.addCenteredBox(-0.014f, 0.073f, 0.06f, 0.008f, 0.013f, 0.012f, 0.15f, 1.0f, 0.55f, -1)
-                mb.addCenteredBox(0.014f, 0.073f, 0.06f, 0.008f, 0.013f, 0.012f, 0.15f, 1.0f, 0.55f, -1)
+                mb.addCenteredBox(0f, 0.074f, -0.185f, 0.012f, 0.016f, 0.014f, 0.15f, 1.0f, 0.55f, -1)
+                mb.addCenteredBox(-0.014f, 0.073f, 0.062f, 0.008f, 0.013f, 0.012f, 0.15f, 1.0f, 0.55f, -1)
+                mb.addCenteredBox(0.014f, 0.073f, 0.062f, 0.008f, 0.013f, 0.012f, 0.15f, 1.0f, 0.55f, -1)
             }
 
             WeaponId.AR_M4A1 -> {
-                // Chamfered upper & lower receiver
-                mb.addChamferedBox(0f, 0.025f, 0.0f, 0.062f, 0.086f, 0.33f, 0.014f, br, bg, bb, 3)
-                // Picatinny top rail teeth
-                for (i in 0..10) {
-                    mb.addCenteredBox(0f, 0.073f, -0.26f + i * 0.036f, 0.034f, 0.012f, 0.018f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                // Sculpted billet upper & lower receiver + shell deflector + forward assist
+                mb.addChamferedBox(0f, 0.025f, 0.0f, 0.064f, 0.088f, 0.335f, 0.016f, br, bg, bb, 3)
+                mb.addCenteredBox(0.036f, 0.040f, 0.03f, 0.016f, 0.026f, 0.035f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addTube(0.032f, 0.028f, 0.09f, 0.038f, 0.028f, 0.14f, 0.010f, 0.012f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
+                // Full-length Picatinny rail teeth
+                for (i in 0..12) {
+                    mb.addCenteredBox(0f, 0.074f, -0.28f + i * 0.034f, 0.034f, 0.012f, 0.016f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
                 }
-                // Cylindrical tactical quad-rail handguard
-                mb.addTube(0f, 0.032f, -0.16f, 0f, 0.032f, -0.43f, 0.033f, 0.031f, 0.14f, 0.16f, 0.19f, 3, 8)
-                // Fluted steel barrel + gas block + 3-prong flash hider
-                mb.addTube(0f, 0.034f, -0.42f, 0f, 0.034f, -0.60f, 0.015f, 0.014f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 12)
-                mb.addTube(0f, 0.034f, -0.59f, 0f, 0.034f, -0.65f, 0.020f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 10)
-                // Angled 3-segment curved STANAG magazine
+                // Cylindrical M-LOK fluted handguard + gas block
+                mb.addTube(0f, 0.032f, -0.16f, 0f, 0.032f, -0.44f, 0.034f, 0.031f, 0.14f, 0.16f, 0.19f, 3, 10)
+                mb.addChamferedBox(0f, 0.044f, -0.45f, 0.036f, 0.054f, 0.035f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 2)
+                // Heavy steel barrel + 3-prong flash hider
+                mb.addTube(0f, 0.034f, -0.43f, 0f, 0.034f, -0.61f, 0.015f, 0.014f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 14)
+                mb.addTube(0f, 0.034f, -0.60f, 0f, 0.034f, -0.66f, 0.021f, 0.023f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
+                // Curved 2-stage PMAG with floorplate pull-tab
                 mb.addOrientedBar(0f, -0.085f, -0.072f, 0f, -0.010f, -0.058f, 0.038f, 0.068f, ar, ag, ab, 3)
-                mb.addOrientedBar(0f, -0.155f, -0.098f, 0f, -0.082f, -0.072f, 0.037f, 0.066f, ar * 0.9f, ag * 0.9f, ab * 0.9f, 3)
-                // Angled pistol grip
+                mb.addOrientedBar(0f, -0.158f, -0.100f, 0f, -0.082f, -0.072f, 0.037f, 0.066f, ar * 0.9f, ag * 0.9f, ab * 0.9f, 3)
+                // Stippled pistol grip + angled vertical foregrip
                 mb.addOrientedBar(0f, -0.105f, 0.125f, 0f, -0.012f, 0.085f, 0.040f, 0.056f, 0.12f, 0.13f, 0.15f, 7)
-                // Angled tactical foregrip
-                mb.addTube(0f, -0.002f, -0.28f, 0f, -0.085f, -0.26f, 0.018f, 0.016f, 0.14f, 0.15f, 0.17f, 7, 10)
-                // Tubular buffer tube + telescoping angled stock
-                mb.addTube(0f, 0.032f, 0.16f, 0f, 0.032f, 0.39f, 0.022f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
-                mb.addOrientedBar(0f, -0.045f, 0.37f, 0f, 0.038f, 0.25f, 0.044f, 0.11f, 0.13f, 0.14f, 0.16f, 3)
-                // Cylindrical Holographic Optic + glowing reticle lens
-                mb.addTube(0f, 0.102f, 0.02f, 0f, 0.102f, -0.08f, 0.028f, 0.030f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
-                mb.addTube(0f, 0.102f, -0.02f, 0f, 0.102f, -0.03f, 0.018f, 0.018f, ar, ag, ab, -1, 12)
+                mb.addTube(0f, -0.002f, -0.28f, 0f, -0.088f, -0.26f, 0.019f, 0.016f, 0.14f, 0.15f, 0.17f, 7, 10)
+                // Buffer tube + ribbed telescoping tactical stock
+                mb.addTube(0f, 0.032f, 0.16f, 0f, 0.032f, 0.39f, 0.022f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 12)
+                mb.addOrientedBar(0f, -0.045f, 0.37f, 0f, 0.038f, 0.25f, 0.044f, 0.11f, 0.13f, 0.14f, 0.16f, 7)
+                // Side PEQ laser box
+                mb.addChamferedBox(-0.038f, 0.038f, -0.35f, 0.026f, 0.026f, 0.075f, 0.006f, 0.16f, 0.18f, 0.16f, 7)
+                // Holographic Sight + glowing reticle dot
+                mb.addChamferedBox(0f, 0.102f, -0.03f, 0.052f, 0.048f, 0.092f, 0.010f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addTube(0f, 0.102f, -0.02f, 0f, 0.102f, -0.03f, 0.016f, 0.016f, ar, ag, ab, -1, 14)
             }
 
             WeaponId.SMG_MPX -> {
-                // Compact beveled receiver
-                mb.addChamferedBox(0f, 0.024f, -0.02f, 0.056f, 0.078f, 0.28f, 0.014f, br, bg, bb, 3)
-                // Cylindrical M-LOK shroud + integral suppressor with heat rings
-                mb.addTube(0f, 0.028f, -0.15f, 0f, 0.028f, -0.32f, 0.028f, 0.028f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 10)
-                mb.addTube(0f, 0.028f, -0.30f, 0f, 0.028f, -0.49f, 0.022f, 0.022f, 0.22f, 0.24f, 0.26f, 2, 14)
-                mb.addTube(0f, 0.028f, -0.39f, 0f, 0.028f, -0.405f, 0.025f, 0.025f, ar, ag, ab, 3, 14)
-                // Long slanted stick magazine
-                mb.addOrientedBar(0f, -0.165f, -0.125f, 0f, -0.010f, -0.082f, 0.032f, 0.046f, ar, ag, ab, 3)
+                // Compact beveled receiver + fluted upper
+                mb.addChamferedBox(0f, 0.024f, -0.02f, 0.058f, 0.078f, 0.285f, 0.015f, br, bg, bb, 3)
+                // Cylindrical shroud + ribbed integral suppressor with glowing heat ring
+                mb.addTube(0f, 0.028f, -0.15f, 0f, 0.028f, -0.32f, 0.029f, 0.029f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
+                mb.addTube(0f, 0.028f, -0.30f, 0f, 0.028f, -0.50f, 0.023f, 0.023f, 0.22f, 0.24f, 0.26f, 2, 16)
+                mb.addTube(0f, 0.028f, -0.38f, 0f, 0.028f, -0.41f, 0.026f, 0.026f, ar, ag, ab, 3, 14)
+                // Extended slanted stick magazine + witness indicator
+                mb.addOrientedBar(0f, -0.170f, -0.128f, 0f, -0.010f, -0.082f, 0.034f, 0.048f, ar, ag, ab, 3)
                 // Angled grip & stub foregrip
                 mb.addOrientedBar(0f, -0.095f, 0.105f, 0f, -0.010f, 0.072f, 0.038f, 0.052f, 0.12f, 0.13f, 0.15f, 7)
-                mb.addTube(0f, -0.002f, -0.24f, 0f, -0.075f, -0.23f, 0.016f, 0.014f, 0.15f, 0.16f, 0.18f, 7, 10)
-                // Folding twin-tube wire stock
-                mb.addTube(-0.018f, 0.036f, 0.12f, -0.018f, 0.030f, 0.32f, 0.008f, 0.008f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
-                mb.addTube(0.018f, 0.036f, 0.12f, 0.018f, 0.030f, 0.32f, 0.008f, 0.008f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
-                mb.addChamferedBox(0f, 0.005f, 0.33f, 0.044f, 0.095f, 0.028f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
-                // Micro red-dot cylinder
-                mb.addTube(0f, 0.086f, 0.0f, 0f, 0.086f, -0.07f, 0.022f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
-                mb.addTube(0f, 0.086f, -0.03f, 0f, 0.086f, -0.04f, 0.015f, 0.015f, ar, ag, ab, -1, 12)
+                mb.addTube(0f, -0.002f, -0.24f, 0f, -0.078f, -0.23f, 0.017f, 0.014f, 0.15f, 0.16f, 0.18f, 7, 10)
+                // Twin-tube sliding PDW stock + buttplate
+                mb.addTube(-0.020f, 0.036f, 0.12f, -0.020f, 0.030f, 0.33f, 0.008f, 0.008f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
+                mb.addTube(0.020f, 0.036f, 0.12f, 0.020f, 0.030f, 0.33f, 0.008f, 0.008f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
+                mb.addChamferedBox(0f, 0.005f, 0.34f, 0.046f, 0.098f, 0.030f, 0.009f, darkSteel.first, darkSteel.second, darkSteel.third, 7)
+                // Micro red-dot cylinder + glowing dot
+                mb.addTube(0f, 0.086f, 0.0f, 0f, 0.086f, -0.075f, 0.023f, 0.023f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 14)
+                mb.addTube(0f, 0.086f, -0.03f, 0f, 0.086f, -0.04f, 0.015f, 0.015f, ar, ag, ab, -1, 14)
             }
 
             WeaponId.SHOTGUN_M870 -> {
-                // Rounded heavy receiver
-                mb.addChamferedBox(0f, 0.024f, 0.02f, 0.062f, 0.080f, 0.30f, 0.018f, br, bg, bb, 3)
-                // Long cylindrical steel barrel + under-barrel magazine tube
-                mb.addTube(0f, 0.048f, -0.12f, 0f, 0.048f, -0.62f, 0.018f, 0.016f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 14)
-                mb.addTube(0f, 0.006f, -0.12f, 0f, 0.006f, -0.54f, 0.017f, 0.017f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 14)
-                // Barrel clamp ring
-                mb.addCenteredBox(0f, 0.027f, -0.50f, 0.040f, 0.066f, 0.026f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
-                // Ribbed cylindrical pump forend
-                mb.addTube(0f, 0.002f, -0.20f, 0f, 0.002f, -0.39f, 0.032f, 0.030f, ar, ag, ab, 4, 12)
-                // Angled timber/composite stock with curved buttpad
-                mb.addOrientedBar(0f, -0.035f, 0.38f, 0f, 0.015f, 0.16f, 0.048f, 0.088f, 0.38f, 0.24f, 0.14f, 4)
-                mb.addChamferedBox(0f, -0.040f, 0.41f, 0.050f, 0.115f, 0.032f, 0.010f, 0.12f, 0.12f, 0.13f, 3)
-                // Side saddle 4 shotgun shells!
+                // Rounded heavy receiver + chrome bolt window
+                mb.addChamferedBox(0f, 0.024f, 0.02f, 0.064f, 0.082f, 0.305f, 0.018f, br, bg, bb, 3)
+                mb.addCenteredBox(0.034f, 0.035f, -0.02f, 0.008f, 0.028f, 0.09f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2)
+                // Cylindrical steel barrel + top ventilated rib + under-barrel magazine tube
+                mb.addTube(0f, 0.048f, -0.12f, 0f, 0.048f, -0.63f, 0.018f, 0.016f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 14)
+                mb.addTube(0f, 0.006f, -0.12f, 0f, 0.006f, -0.55f, 0.017f, 0.017f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 14)
+                mb.addCenteredBox(0f, 0.068f, -0.37f, 0.012f, 0.010f, 0.48f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addCenteredBox(0f, 0.027f, -0.51f, 0.042f, 0.068f, 0.028f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                // Ribbed wood pump forend + slide action bars
+                mb.addTube(0f, 0.002f, -0.20f, 0f, 0.002f, -0.40f, 0.033f, 0.030f, 0.46f, 0.28f, 0.16f, 4, 14)
+                mb.addTube(-0.022f, 0.002f, -0.12f, -0.022f, 0.002f, -0.22f, 0.005f, 0.005f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 6)
+                mb.addTube(0.022f, 0.002f, -0.12f, 0.022f, 0.002f, -0.22f, 0.005f, 0.005f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 6)
+                // Walnut angled stock + rubber recoil buttpad
+                mb.addOrientedBar(0f, -0.035f, 0.38f, 0f, 0.015f, 0.16f, 0.048f, 0.088f, 0.42f, 0.25f, 0.14f, 4)
+                mb.addChamferedBox(0f, -0.040f, 0.415f, 0.050f, 0.115f, 0.034f, 0.010f, 0.12f, 0.12f, 0.13f, 7)
+                // Side-saddle 4 red shotgun shells with brass bases!
                 for (i in 0..3) {
-                    mb.addTube(-0.035f, 0.002f, -0.05f + i * 0.032f, -0.035f, 0.052f, -0.05f + i * 0.032f, 0.011f, 0.011f, 0.88f, 0.16f, 0.14f, 3, 8)
+                    val sz = -0.05f + i * 0.032f
+                    mb.addTube(-0.036f, 0.010f, sz, -0.036f, 0.056f, sz, 0.011f, 0.011f, 0.88f, 0.16f, 0.14f, 7, 8)
+                    mb.addTube(-0.036f, -0.002f, sz, -0.036f, 0.012f, sz, 0.012f, 0.012f, 0.92f, 0.75f, 0.24f, 2, 8)
                 }
-                // Glowing front fiber sight
-                mb.addCenteredBox(0f, 0.070f, -0.60f, 0.010f, 0.014f, 0.016f, 1.0f, 0.45f, 0.10f, -1)
+                // Glowing fiber optic bead sight
+                mb.addCenteredBox(0f, 0.076f, -0.61f, 0.010f, 0.014f, 0.016f, 1.0f, 0.45f, 0.10f, -1)
             }
 
             WeaponId.SNIPER_AWP -> {
-                // Sculpted thumbhole olive chassis
-                mb.addChamferedBox(0f, 0.014f, 0.02f, 0.068f, 0.088f, 0.44f, 0.016f, br, bg, bb, 3)
-                // Heavy cylindrical free-float barrel + slotted tank muzzle brake
-                mb.addTube(0f, 0.042f, -0.18f, 0f, 0.042f, -0.78f, 0.022f, 0.017f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 14)
-                mb.addChamferedBox(0f, 0.042f, -0.82f, 0.046f, 0.040f, 0.085f, 0.008f, ar, ag, ab, 3)
-                // Multi-stage cylindrical telescopic sniper scope!
-                mb.addTube(0f, 0.108f, 0.10f, 0f, 0.108f, 0.02f, 0.028f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 14) // eyepiece
-                mb.addTube(0f, 0.108f, 0.02f, 0f, 0.108f, -0.16f, 0.020f, 0.020f, 0.18f, 0.20f, 0.22f, 2, 14) // main tube
-                mb.addTube(0f, 0.108f, -0.16f, 0f, 0.108f, -0.26f, 0.020f, 0.036f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 16) // flared objective bell
-                // Glowing cyan scope lens + turret knobs
-                mb.addTube(0f, 0.108f, -0.258f, 0f, 0.108f, -0.262f, 0.028f, 0.028f, 0.10f, 0.85f, 0.98f, -1, 14)
-                mb.addCylinder(0f, 0.125f, -0.07f, 0.014f, 0.022f, ar, ag, ab, 3, 10)
-                // Scope rings
+                // Sculpted thumbhole chassis + cheek riser + box mag
+                mb.addChamferedBox(0f, 0.014f, 0.02f, 0.068f, 0.088f, 0.45f, 0.017f, br, bg, bb, 3)
+                // Bolt handle & knob on right side!
+                mb.addTube(0.032f, 0.045f, 0.06f, 0.078f, 0.025f, 0.075f, 0.007f, 0.007f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
+                mb.addTube(0.074f, 0.025f, 0.075f, 0.090f, 0.018f, 0.082f, 0.015f, 0.015f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 10)
+                // Fluted free-float barrel + tank muzzle brake
+                mb.addTube(0f, 0.042f, -0.18f, 0f, 0.042f, -0.79f, 0.023f, 0.017f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 16)
+                mb.addChamferedBox(0f, 0.042f, -0.83f, 0.048f, 0.042f, 0.090f, 0.009f, ar, ag, ab, 3)
+                // Dual-stage Sniper Scope with turret dials & glowing cyan lenses
+                mb.addTube(0f, 0.108f, 0.10f, 0f, 0.108f, 0.02f, 0.029f, 0.022f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 14)
+                mb.addTube(0f, 0.108f, 0.02f, 0f, 0.108f, -0.16f, 0.021f, 0.021f, 0.18f, 0.20f, 0.22f, 2, 14)
+                mb.addTube(0f, 0.108f, -0.16f, 0f, 0.108f, -0.27f, 0.021f, 0.038f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 16)
+                mb.addTube(0f, 0.108f, -0.268f, 0f, 0.108f, -0.272f, 0.030f, 0.030f, 0.10f, 0.85f, 0.98f, -1, 14)
+                mb.addCylinder(0f, 0.125f, -0.07f, 0.014f, 0.024f, ar, ag, ab, 3, 10)
+                mb.addTube(0.018f, 0.108f, -0.07f, 0.040f, 0.108f, -0.07f, 0.012f, 0.012f, ar, ag, ab, 3, 10)
                 mb.addCenteredBox(0f, 0.082f, -0.01f, 0.044f, 0.050f, 0.024f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
                 mb.addCenteredBox(0f, 0.082f, -0.13f, 0.044f, 0.050f, 0.024f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
-                // Folded cylindrical bipod legs under forend
-                mb.addTube(-0.028f, -0.018f, -0.20f, -0.036f, -0.028f, -0.42f, 0.010f, 0.012f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
-                mb.addTube(0.028f, -0.018f, -0.20f, 0.036f, -0.028f, -0.42f, 0.010f, 0.012f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 8)
-                // Angled thumbhole stock + adjustable cheek riser
+                // Folded cylindrical bipod legs + rubber feet
+                mb.addTube(-0.028f, -0.018f, -0.20f, -0.036f, -0.028f, -0.43f, 0.010f, 0.012f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
+                mb.addTube(0.028f, -0.018f, -0.20f, 0.036f, -0.028f, -0.43f, 0.010f, 0.012f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
+                // Thumbhole stock + rubberized cheek pad + box mag
                 mb.addOrientedBar(0f, -0.030f, 0.42f, 0f, 0.014f, 0.22f, 0.050f, 0.092f, br, bg, bb, 3)
                 mb.addChamferedBox(0f, 0.048f, 0.34f, 0.044f, 0.032f, 0.12f, 0.008f, 0.14f, 0.15f, 0.16f, 7)
-                // Precision box magazine
-                mb.addChamferedBox(0f, -0.062f, -0.04f, 0.040f, 0.078f, 0.095f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addChamferedBox(0f, -0.062f, -0.04f, 0.040f, 0.078f, 0.095f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 7)
             }
 
             WeaponId.LMG_M249 -> {
-                // Heavy machined receiver + hinged feed cover
-                mb.addChamferedBox(0f, 0.032f, -0.02f, 0.082f, 0.096f, 0.40f, 0.016f, br, bg, bb, 3)
-                mb.addChamferedBox(0f, 0.090f, -0.04f, 0.068f, 0.024f, 0.26f, 0.008f, darkSteel.first, darkSteel.second, darkSteel.third, 2)
-                // Perforated cylindrical barrel shroud + heavy fluted barrel + flash hider
-                mb.addTube(0f, 0.042f, -0.20f, 0f, 0.042f, -0.48f, 0.038f, 0.035f, 0.16f, 0.18f, 0.20f, 2, 12)
-                mb.addTube(0f, 0.045f, -0.46f, 0f, 0.045f, -0.68f, 0.018f, 0.017f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 12)
-                mb.addTube(0f, 0.045f, -0.66f, 0f, 0.045f, -0.73f, 0.024f, 0.024f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 10)
-                // Large cylindrical ammo drum + visible brass cartridge belt!
-                mb.addTube(-0.045f, -0.078f, -0.14f, -0.045f, -0.078f, -0.01f, 0.068f, 0.068f, ar, ag, ab, 2, 16)
+                // Heavy machined receiver + feed tray top cover
+                mb.addChamferedBox(0f, 0.032f, -0.02f, 0.084f, 0.096f, 0.41f, 0.018f, br, bg, bb, 3)
+                mb.addChamferedBox(0f, 0.090f, -0.04f, 0.068f, 0.026f, 0.26f, 0.009f, darkSteel.first, darkSteel.second, darkSteel.third, 2)
+                // Perforated cylindrical shroud + heavy fluted barrel + flash hider
+                mb.addTube(0f, 0.042f, -0.20f, 0f, 0.042f, -0.49f, 0.039f, 0.036f, 0.16f, 0.18f, 0.20f, 2, 14)
+                mb.addTube(0f, 0.045f, -0.46f, 0f, 0.045f, -0.69f, 0.018f, 0.017f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 14)
+                mb.addTube(0f, 0.045f, -0.67f, 0f, 0.045f, -0.74f, 0.025f, 0.025f, darkSteel.first, darkSteel.second, darkSteel.third, 3, 12)
+                // Cylindrical ammo drum + visible 5-round brass cartridge belt!
+                mb.addTube(-0.046f, -0.078f, -0.14f, -0.046f, -0.078f, -0.01f, 0.068f, 0.068f, ar, ag, ab, 7, 16)
                 for (i in 0..4) {
-                    mb.addTube(-0.062f, -0.02f + i * 0.014f, -0.07f, -0.025f, -0.01f + i * 0.014f, -0.07f, 0.006f, 0.003f, 0.96f, 0.78f, 0.24f, 2, 6)
+                    mb.addTube(-0.064f, -0.02f + i * 0.014f, -0.07f, -0.025f, -0.01f + i * 0.014f, -0.07f, 0.006f, 0.003f, 0.96f, 0.78f, 0.24f, 2, 6)
                 }
-                // Angled grip & heavy tubular para stock
+                // Angled grip & heavy twin-rail para stock
                 mb.addOrientedBar(0f, -0.095f, 0.14f, 0f, -0.008f, 0.10f, 0.044f, 0.060f, 0.12f, 0.13f, 0.15f, 7)
                 mb.addTube(0f, 0.042f, 0.18f, 0f, 0.032f, 0.42f, 0.020f, 0.020f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
                 mb.addTube(0f, -0.020f, 0.18f, 0f, -0.030f, 0.42f, 0.014f, 0.014f, chromeSteel.first, chromeSteel.second, chromeSteel.third, 2, 10)
-                mb.addChamferedBox(0f, 0.002f, 0.43f, 0.056f, 0.115f, 0.034f, 0.010f, darkSteel.first, darkSteel.second, darkSteel.third, 3)
+                mb.addChamferedBox(0f, 0.002f, 0.43f, 0.056f, 0.115f, 0.034f, 0.010f, darkSteel.first, darkSteel.second, darkSteel.third, 7)
                 // Folded bipod legs & carrying handle
                 mb.addTube(-0.036f, -0.01f, -0.26f, -0.042f, -0.02f, -0.47f, 0.012f, 0.012f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 8)
                 mb.addTube(0.036f, -0.01f, -0.26f, 0.042f, -0.02f, -0.47f, 0.012f, 0.012f, darkSteel.first, darkSteel.second, darkSteel.third, 2, 8)
-                mb.addCenteredBox(0f, 0.12f, -0.20f, 0.018f, 0.018f, 0.09f, ar, ag, ab, 3)
+                mb.addCenteredBox(0f, 0.122f, -0.20f, 0.018f, 0.020f, 0.095f, ar, ag, ab, 3)
             }
         }
         return mb.build()

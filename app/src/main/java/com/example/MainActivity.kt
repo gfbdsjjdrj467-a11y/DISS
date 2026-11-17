@@ -107,11 +107,13 @@ private fun StrikeArenaRoot(
                 settings = settings,
                 careerStats = careerStats,
                 onPlayClick = { viewModel.startMatch() },
+                onPlayRankedClick = { viewModel.startRanked2v2Match() },
                 onNavigate = { viewModel.navigateTo(it) }
             )
 
             AppRoute.MAP_MODE_SELECT -> MapModeSelectScreen(
                 settings = settings,
+                careerStats = careerStats,
                 onSelectMap = { viewModel.selectMap(it) },
                 onSelectMode = { viewModel.selectMode(it) },
                 onSelectDifficulty = { viewModel.selectDifficulty(it) },
@@ -125,6 +127,7 @@ private fun StrikeArenaRoot(
                 careerStats = careerStats,
                 onEquipPrimary = { viewModel.equipPrimaryWeapon(it) },
                 onEquipSecondary = { viewModel.equipSecondaryWeapon(it) },
+                onEquipSkin = { wId, skin -> viewModel.equipWeaponSkin(wId, skin) },
                 onBack = { viewModel.navigateTo(AppRoute.MAIN_MENU) }
             )
 

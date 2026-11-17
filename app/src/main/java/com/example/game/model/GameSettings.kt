@@ -57,5 +57,8 @@ data class GameSettings(
     val selectedMap: MapId = MapId.DESERT_BASE,
     val selectedMode: GameModeType = GameModeType.TEAM_DEATHMATCH,
     val primaryWeapon: WeaponId = WeaponId.AR_M4A1,
-    val secondaryWeapon: WeaponId = WeaponId.PISTOL_P9
-)
+    val secondaryWeapon: WeaponId = WeaponId.PISTOL_P9,
+    val weaponSkins: Map<WeaponId, WeaponSkin> = emptyMap()
+) {
+    fun skinFor(id: WeaponId): WeaponSkin = weaponSkins[id] ?: WeaponSkin.FACTORY_STOCK
+}
